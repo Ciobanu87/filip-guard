@@ -52,3 +52,13 @@ def analyze_pages(rows):
             })
 
     return recommendations
+
+
+def suggest_meta_description(title):
+    if not title:
+        return "Add a clear page title first."
+
+    return (
+        f"Discover {title}. Learn more about "
+        "our services, benefits, and solutions."
+    )
