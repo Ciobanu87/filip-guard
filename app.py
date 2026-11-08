@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlparse, urldefrag
 import requests
 import streamlit as st
 from bs4 import BeautifulSoup
-
+from ai_advisor import analyze_pages
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
 st.title('🛡️ FILIP GUARD')
 st.caption('Website Health & SEO • Beta')
@@ -168,6 +168,9 @@ if submitted:
             st.dataframe(rows, use_container_width=True, hide_index=True)
             st.download_button('Download page audit CSV', to_csv(rows), 'filip_guard_pages.csv', 'text/csv')
             st.subheader('Internal link issues')
+            st.subheader('AI Advisor - SEO Recommendations')
+            recommendations = analyze_pages(rows)
+            st.dataframe(recommendations, use_container_width=True, hide_index=True)
             if broken:
                 st.dataframe(broken, use_container_width=True, hide_index=True)
                 st.download_button('Download link issues CSV', to_csv(broken), 'filip_guard_links.csv', 'text/csv')
