@@ -10,6 +10,7 @@ import requests
 import streamlit as st
 from bs4 import BeautifulSoup
 from ai_advisor import analyze_pages, suggest_meta_description
+from link_resolver import suggest_replacements
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
 st.title('🛡️ FILIP GUARD')
 st.caption('Website Health & SEO • Beta')
@@ -138,6 +139,64 @@ def scan(start, limit):
     return rows, broken, min(len(link_sources), 100), len(link_sources)
 
 
+
+def wordpress_public_items(site_host):
+    """Read a small, bounded sample of public WP REST API content; never edit."""
+    items = []
+    for kind in ('pages', 'posts'):
+        endpoint = f'https://{site_host}/wp-json/wp/v2/{kind}?per_page=30&_fields=link,slug,title,status'
+        try:
+            validate_url(endpoint, site_host)
+            response = requests.get(endpoint, headers=HEADERS, timeout=(4, 8),
+                                    allow_redirects=False, stream=True)
+            try:
+                if response.status_code != 200 or 'json' not in response.headers.get('Content-Type', '').lower():
+                    continue
+                chunks = bytearray()
+                for chunk in response.iter_content(chunk_size=16384):
+                    chunks.extend(chunk)
+                    if len(chunks) > MAX_BYTES:
+                        raise ValueError('WordPress API response too large')
+                import json
+                data = json.loads(chunks)
+                if isinstance(data, list):
+                    items.extend(item for item in data if isinstance(item, dict))
+            finally:
+                response.close()
+        except (requests.RequestException, ValueError, UnicodeError):
+            continue
+    return items
+
+
+def verified_wordpress_suggestions(broken):
+    """Read-only suggestions; verify URLs and require human review."""
+    if not broken:
+        return []
+    host = urlparse(broken[0]['link']).hostname
+    if not host:
+        return []
+    items = wordpress_public_items(host)
+    if not items:
+        return []
+    suggestions = []
+    for issue in broken[:5]:
+        broken_url = issue['link']
+        if urlparse(broken_url).hostname != host:
+            continue
+        for match in suggest_replacements(broken_url, items, limit=3):
+            candidate = match['candidate_url']
+            try:
+                status, _, _ = fetch(candidate, host, 'HEAD')
+                if status in (403, 405, 501):
+                    status, _, _ = fetch(candidate, host, 'GET')
+                if 200 <= status < 400:
+                    match['verified'] = True
+                    suggestions.append(match)
+            except (requests.RequestException, ValueError):
+                continue
+    return suggestions
+
+
 def to_csv(rows):
     if not rows:
         return ''
@@ -177,6 +236,14 @@ if submitted:
             if broken:
                 st.dataframe(broken, use_container_width=True, hide_index=True)
                 st.download_button('Download link issues CSV', to_csv(broken), 'filip_guard_links.csv', 'text/csv')
+                st.subheader('WordPress link replacement suggestions (read-only)')
+                with st.spinner('Checking public WordPress content for possible replacements…'):
+                    candidates = verified_wordpress_suggestions(broken)
+                if candidates:
+                    st.dataframe(candidates, use_container_width=True, hide_index=True)
+                    st.caption('Candidates are reachable, but their relevance is not confirmed. Review before any change. No edits are made.')
+                else:
+                    st.info('No verified WordPress replacement candidates found in the sampled public pages/posts.')
             else:
                 st.info(f'No broken links found among {checked} checked (of {discovered} discovered). This does not guarantee all links work.')
         except (ValueError, requests.RequestException) as exc:
