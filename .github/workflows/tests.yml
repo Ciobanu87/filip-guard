@@ -1,0 +1,30 @@
+
+name: Filip Guard Tests
+
+on:
+  push:
+    branches:
+      - filip-guard-development
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run tests
+        run: |
+          python -m unittest discover -s . -p "test_*.py" -v
