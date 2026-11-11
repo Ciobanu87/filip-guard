@@ -26,7 +26,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: python -m pip install -r requirements.txt
+        run: python -m pip install -r requirements.txt           
+      - name: Diagnose test discovery
+        run: python -m unittest discover -s . -p "test_wordpress_repair_workflow.py" -v
+
 
       - name: Run tests
         run: |
