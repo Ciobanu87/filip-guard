@@ -11,6 +11,7 @@ import streamlit as st
 from bs4 import BeautifulSoup
 from ai_advisor import analyze_pages, suggest_meta_description
 from link_resolver import suggest_replacements
+from wordpress_autofix_ui import render_wordpress_autofix_ui
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
 st.title('🛡️ FILIP GUARD')
 st.caption('Website Health & SEO • Beta')
@@ -250,3 +251,4 @@ if submitted:
             st.error(f'Could not scan: {exc}')
 
 st.caption('Beta: checks HTML SEO signals and internal links only. Not a complete SEO, performance or security audit. Scan sites you own or are authorized to audit.')
+render_wordpress_autofix_ui()
