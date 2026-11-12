@@ -30,10 +30,10 @@ jobs:
       - name: List test files
         run: ls -la test_*.py
 
-      - name: Diagnose test discovery
-        run: |
-          ls -l test_wordpress_repair_workflow.py
-          python -m unittest test_wordpress_repair_workflow -v
+      
+        
+        
+        
 
       - name: Run tests
         run: python -m unittest discover -s . -p "test_*.py" -v
