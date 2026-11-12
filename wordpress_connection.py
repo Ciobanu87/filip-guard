@@ -9,6 +9,7 @@ No website changes are performed.
 from urllib.parse import urlparse
 
 from wordpress_adapter import WordPressAdapter
+from wordpress_security import validate_public_wordpress_url
 
 
 class WordPressConnection:
@@ -40,7 +41,9 @@ class WordPressConnection:
     def verify(self, site_url, username, app_password):
         """Verify credentials without changing WordPress."""
 
-        validated_url = self.validate_url(site_url)
+        validated_url = validate_public_wordpress_url(
+    self.validate_url(site_url)
+)
 
         if not isinstance(username, str) or not username.strip():
             raise ValueError("Username is required.")
