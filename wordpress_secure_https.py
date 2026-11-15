@@ -39,3 +39,37 @@ def resolve_public_ips(hostname):
         )
 
     return sorted(addresses)
+
+
+
+def create_verified_connection(hostname, timeout=15):
+    """Open TLS connection to a verified public IP."""
+    import socket
+    import ssl
+
+    addresses = resolve_public_ips(hostname)
+    last_error = None
+
+    for address in addresses:
+        try:
+            connection = socket.create_connection(
+                (address, 443),
+                timeout=timeout,
+            )
+
+            try:
+                context = ssl.create_default_context()
+                return context.wrap_socket(
+                    connection,
+                    server_hostname=hostname,
+                )
+            except Exception:
+                connection.close()
+                raise
+
+        except (OSError, ssl.SSLError) as exc:
+            last_error = exc
+
+    raise ConnectionError(
+        "Could not establish a secure HTTPS connection."
+    ) from last_error
