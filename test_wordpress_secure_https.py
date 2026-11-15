@@ -119,5 +119,27 @@ class TestWordPressSecureHTTPS(unittest.TestCase):
 
             connect.assert_not_called()
 
+
+    def test_https_closes_socket_on_tls_failure(self):
+        import ssl
+
+        with patch(
+            "wordpress_secure_https.resolve_public_ips",
+            return_value=["8.8.8.8"],
+        ), patch(
+            "wordpress_secure_https.socket.create_connection"
+        ) as connect, patch(
+            "ssl.create_default_context"
+        ) as ssl_context:
+            ssl_context.return_value.wrap_socket.side_effect = (
+                ssl.SSLError("TLS failed")
+            )
+
+            with self.assertRaises(ConnectionError):
+                create_verified_connection("example.com")
+
+            connect.return_value.close.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
