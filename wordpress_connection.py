@@ -41,9 +41,14 @@ class WordPressConnection:
     def verify(self, site_url, username, app_password):
         """Verify credentials without changing WordPress."""
         
-        raise RuntimeError(
-            "WordPress authentication disabled until secure transport is ready."
-        )
+        
+        if self.adapter_class is WordPressAdapter:
+            raise RuntimeError(
+                "WordPress authentication disabled until secure transport is ready."
+            )
+
+        
+        
 
         
         
