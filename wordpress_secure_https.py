@@ -73,3 +73,40 @@ def create_verified_connection(hostname, timeout=15):
     raise ConnectionError(
         "Could not establish a secure HTTPS connection."
     ) from last_error
+
+
+
+def secure_https_get(hostname, path="/", timeout=15):
+    """Send a GET request over verified TLS."""
+    if not isinstance(path, str) or not path.startswith("/"):
+        raise ValueError("Invalid HTTPS path.")
+
+    if any(c in path for c in "\r\n"):
+        raise ValueError("Invalid characters in path.")
+
+    connection = create_verified_connection(
+        hostname,
+        timeout=timeout,
+    )
+
+    try:
+        request = (
+            f"GET {path} HTTP/1.1\r\n"
+            f"Host: {hostname}\r\n"
+            "Accept: application/json\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+        )
+
+        connection.sendall(request.encode("ascii"))
+
+        chunks = []
+        while True:
+            chunk = connection.recv(65536)
+            if not chunk:
+                break
+            chunks.append(chunk)
+
+        return b"".join(chunks)
+    finally:
+        connection.close()
