@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from wordpress_secure_https import (
     UnsafeDestinationError,
+    create_verified_connection,
     resolve_public_ips,
 )
 
@@ -81,6 +82,42 @@ class TestWordPressSecureHTTPS(unittest.TestCase):
         with self.assertRaises(UnsafeDestinationError):
             resolve_public_ips("")
 
+
+    def test_https_uses_verified_ip(self):
+        with patch(
+            "wordpress_secure_https.resolve_public_ips",
+            return_value=["8.8.8.8"],
+        ), patch(
+            "wordpress_secure_https.socket.create_connection"
+        ) as connect, patch(
+            "ssl.create_default_context"
+        ) as ssl_context:
+            result = create_verified_connection("example.com")
+
+            connect.assert_called_once_with(
+                ("8.8.8.8", 443),
+                timeout=15,
+            )
+            ssl_context.return_value.wrap_socket.assert_called_once_with(
+                connect.return_value,
+                server_hostname="example.com",
+            )
+            self.assertIs(
+                result,
+                ssl_context.return_value.wrap_socket.return_value,
+            )
+
+    def test_https_rejects_unsafe_dns(self):
+        with patch(
+            "wordpress_secure_https.resolve_public_ips",
+            side_effect=UnsafeDestinationError("Blocked"),
+        ), patch(
+            "wordpress_secure_https.socket.create_connection"
+        ) as connect:
+            with self.assertRaises(UnsafeDestinationError):
+                create_verified_connection("example.com")
+
+            connect.assert_not_called()
 
 if __name__ == "__main__":
     unittest.main()
