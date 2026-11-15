@@ -40,6 +40,9 @@ class WordPressConnection:
 
     def verify(self, site_url, username, app_password):
         """Verify credentials without changing WordPress."""
+                raise RuntimeError(
+            "WordPress authentication disabled until secure transport is ready."
+        )
 
         validated_url = validate_public_wordpress_url(
     self.validate_url(site_url)
