@@ -100,12 +100,28 @@ def secure_https_get(hostname, path="/", timeout=15):
 
         connection.sendall(request.encode("ascii"))
 
+        
+        max_response_size = 2 * 1024 * 1024
+        total_size = 0
         chunks = []
+
         while True:
             chunk = connection.recv(65536)
             if not chunk:
                 break
+
+            total_size += len(chunk)
+
+            if total_size > max_response_size:
+                raise ValueError("HTTPS response too large.")
+
             chunks.append(chunk)
+
+    
+        
+            
+            
+            
 
         return b"".join(chunks)
     finally:
