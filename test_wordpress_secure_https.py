@@ -141,5 +141,30 @@ class TestWordPressSecureHTTPS(unittest.TestCase):
             connect.return_value.close.assert_called_once()
 
 
+    def test_secure_https_get_success(self):
+        from wordpress_secure_https import secure_https_get
+
+        with patch(
+            "wordpress_secure_https.create_verified_connection"
+        ) as connect:
+            connection = connect.return_value
+            connection.recv.side_effect = [
+                b"HTTP/1.1 200 OK\r\n\r\nHello",
+                b"",
+            ]
+
+            result = secure_https_get(
+                "example.com", "/wp-json/"
+            )
+
+            self.assertEqual(
+                result,
+                b"HTTP/1.1 200 OK\r\n\r\nHello",
+            )
+            connection.sendall.assert_called_once()
+            connection.close.assert_called_once()
+
+
+
 if __name__ == "__main__":
     unittest.main()
