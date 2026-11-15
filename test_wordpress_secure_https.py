@@ -164,6 +164,25 @@ class TestWordPressSecureHTTPS(unittest.TestCase):
             connection.sendall.assert_called_once()
             connection.close.assert_called_once()
 
+    def test_secure_https_get_rejects_large_response(self):
+        from wordpress_secure_https import secure_https_get
+
+        with patch(
+            "wordpress_secure_https.create_verified_connection"
+        ) as connect:
+            connection = connect.return_value
+
+            connection.recv.side_effect = [
+                b"A" * (2 * 1024 * 1024 + 1),
+            ]
+
+            with self.assertRaisesRegex(
+                ValueError, "HTTPS response too large"
+            ):
+                secure_https_get("example.com", "/wp-json/")
+
+            connection.close.assert_called_once()
+
 
 
 if __name__ == "__main__":
