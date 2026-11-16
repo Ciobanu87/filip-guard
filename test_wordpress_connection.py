@@ -1,6 +1,7 @@
 
 import unittest
-from unittest.mock import Mock
+import socket
+from unittest.mock import Mock, patch
 
 from wordpress_connection import WordPressConnection
 
@@ -8,6 +9,12 @@ from wordpress_connection import WordPressConnection
 class TestWordPressConnection(unittest.TestCase):
 
     def setUp(self):
+        # Unit tests must not depend on external DNS availability.
+        dns = patch("wordpress_security.socket.getaddrinfo", return_value=[
+            (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443)),
+        ])
+        dns.start()
+        self.addCleanup(dns.stop)
         self.adapter = Mock()
         self.adapter.verify_connection.return_value = {
             "connected": True,
