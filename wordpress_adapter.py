@@ -15,6 +15,13 @@ class WordPressAdapter:
         if not username or not app_password:
             raise ValueError("WordPress credentials are required.")
 
+        # Fail closed until all authenticated requests use the verified,
+        # DNS-pinned HTTPS transport. This guard also protects callers that
+        # bypass WordPressConnection and instantiate the adapter directly.
+        raise RuntimeError(
+            "WordPress authentication disabled until secure transport is integrated."
+        )
+
         self.site_url = site_url.rstrip("/") + "/"
         self.session = requests.Session()
         self.session.auth = (username, app_password)
