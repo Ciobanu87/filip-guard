@@ -190,7 +190,7 @@ def _validate_request(hostname, path, timeout):
     return host_header
 
 
-def secure_https_get(hostname, path="/", timeout=15):
+def secure_https_get(hostname, path="/", timeout=15, *, headers=()):
     """Return validated raw HTTP bytes from an unauthenticated HTTPS GET.
 
     No redirects or credentials. Total wire response is limited to 2 MiB.
@@ -198,6 +198,8 @@ def secure_https_get(hostname, path="/", timeout=15):
     Abrupt TLS EOF is rejected, including for connection-close framing.
     """
     host_header = _validate_request(hostname, path, timeout)
+    from wordpress_http_headers import validate_request_headers
+    safe_headers = validate_request_headers(headers)
     deadline = time.monotonic() + timeout
     connection = create_verified_connection(hostname, timeout=timeout)
 
@@ -214,7 +216,8 @@ def secure_https_get(hostname, path="/", timeout=15):
             "Accept: application/json\r\n"
             "Accept-Encoding: identity\r\n"
             "Connection: close\r\n"
-            "\r\n"
+            + "".join(f"{name}: {value}\r\n" for name, value in safe_headers)
+            + "\r\n"
         )
         remaining_timeout()
         connection.sendall(request.encode("ascii"))
