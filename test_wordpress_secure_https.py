@@ -424,3 +424,23 @@ class TestHTTPSGetValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDNSIntegration(unittest.TestCase):
+    def test_resolve_uses_bounded_dns(self):
+        with patch("wordpress_dns_deadline.getaddrinfo_with_deadline", return_value=fake_dns("8.8.8.8")) as dns:
+            self.assertEqual(resolve_public_ips("example.com", timeout=3), ["8.8.8.8"])
+            dns.assert_called_once_with("example.com", 443, timeout=3)
+
+    def test_dns_timeout_blocks_tcp(self):
+        from wordpress_dns_deadline import DNSDeadlineExceeded
+        with patch("wordpress_dns_deadline.getaddrinfo_with_deadline", side_effect=DNSDeadlineExceeded("expired")), patch("wordpress_https_deadline.socket.create_connection") as tcp:
+            with self.assertRaises(DNSDeadlineExceeded):
+                create_verified_connection("example.com", timeout=2)
+            tcp.assert_not_called()
+
+    def test_dns_rejects_private_ip_before_tcp(self):
+        with patch("wordpress_dns_deadline.getaddrinfo_with_deadline", return_value=fake_dns("10.0.0.1")), patch("wordpress_https_deadline.socket.create_connection") as tcp:
+            with self.assertRaises(UnsafeDestinationError):
+                create_verified_connection("example.com", timeout=2)
+            tcp.assert_not_called()

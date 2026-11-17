@@ -13,16 +13,13 @@ class UnsafeDestinationError(ValueError):
     """Destination is not safe for connection."""
 
 
-def resolve_public_ips(hostname):
+def resolve_public_ips(hostname, *, timeout=15):
     """Resolve hostname and reject non-public IPs."""
     if not hostname:
         raise UnsafeDestinationError("Missing hostname.")
 
-    results = socket.getaddrinfo(
-        hostname,
-        443,
-        type=socket.SOCK_STREAM,
-    )
+    from wordpress_dns_deadline import getaddrinfo_with_deadline
+    results = getaddrinfo_with_deadline(hostname, 443, timeout=timeout)
 
     addresses = set()
 
@@ -53,7 +50,7 @@ def create_verified_connection(hostname, timeout=15):
     from wordpress_https_deadline import Deadline, connect_pinned_addresses
 
     deadline = Deadline(timeout)
-    addresses = resolve_public_ips(hostname)
+    addresses = resolve_public_ips(hostname, timeout=deadline.remaining())
     return connect_pinned_addresses(hostname, addresses, deadline)
 
 
