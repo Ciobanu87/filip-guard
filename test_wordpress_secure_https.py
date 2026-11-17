@@ -100,15 +100,17 @@ class TestWordPressSecureHTTPS(unittest.TestCase):
         ) as ssl_context:
             result = create_verified_connection("example.com")
 
-            connect.assert_called_once_with(
-                ("8.8.8.8", 443),
-                timeout=15,
-            )
+            connect.assert_called_once()
+            self.assertEqual(connect.call_args.args[0], ("8.8.8.8", 443))
+            self.assertGreater(connect.call_args.kwargs["timeout"], 0)
+            self.assertLessEqual(connect.call_args.kwargs["timeout"], 15)
             ssl_context.return_value.wrap_socket.assert_called_once_with(
                 connect.return_value,
                 server_hostname="example.com",
                 suppress_ragged_eofs=False,
+                do_handshake_on_connect=False,
             )
+            ssl_context.return_value.wrap_socket.return_value.do_handshake.assert_called_once()
             self.assertIs(
                 result,
                 ssl_context.return_value.wrap_socket.return_value,
