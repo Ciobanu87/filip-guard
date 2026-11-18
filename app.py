@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 from ai_advisor import analyze_pages, suggest_meta_description
 from link_resolver import suggest_replacements
 from wordpress_autofix_ui import render_wordpress_autofix_ui
+from wordpress_public_audit_ui import render_public_wordpress_audit
+
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
 st.title('🛡️ FILIP GUARD')
 st.caption('Website Health & SEO • Beta')
@@ -140,7 +142,6 @@ def scan(start, limit):
     return rows, broken, min(len(link_sources), 100), len(link_sources)
 
 
-
 def wordpress_public_items(site_host):
     """Read a small, bounded sample of public WP REST API content; never edit."""
     items = []
@@ -213,42 +214,55 @@ with st.form('audit'):
     submitted = st.form_submit_button('🔎 Scan website', type='primary')
 
 if submitted:
+    st.session_state.pop('fg_scan_result', None)
     if not url.strip():
         st.warning('Enter a website URL.')
     else:
         try:
             with st.spinner('Scanning public pages. This may take a little while…'):
                 rows, broken, checked, discovered = scan(url.strip(), pages)
-            st.success(f'Scanned {len(rows)} pages')
-            a, b, c = st.columns(3)
-            a.metric('Pages', len(rows))
-            b.metric('Links checked', checked)
-            c.metric('Link issues', len(broken))
-            st.subheader('Page audit')
-            st.dataframe(rows, use_container_width=True, hide_index=True)
-            st.download_button('Download page audit CSV', to_csv(rows), 'filip_guard_pages.csv', 'text/csv')
-            st.subheader('Internal link issues')
-            st.subheader('AI Advisor - SEO Recommendations')
-            recommendations = analyze_pages(rows)
-            st.dataframe(recommendations, use_container_width=True, hide_index=True)
-            for page in rows:
-                if "Missing meta description" in str(page.get("issues", "")):
-                    st.write(suggest_meta_description(page.get("title", "")))
-            if broken:
-                st.dataframe(broken, use_container_width=True, hide_index=True)
-                st.download_button('Download link issues CSV', to_csv(broken), 'filip_guard_links.csv', 'text/csv')
-                st.subheader('WordPress link replacement suggestions (read-only)')
-                with st.spinner('Checking public WordPress content for possible replacements…'):
-                    candidates = verified_wordpress_suggestions(broken)
-                if candidates:
-                    st.dataframe(candidates, use_container_width=True, hide_index=True)
-                    st.caption('Candidates are reachable, but their relevance is not confirmed. Review before any change. No edits are made.')
-                else:
-                    st.info('No verified WordPress replacement candidates found in the sampled public pages/posts.')
-            else:
-                st.info(f'No broken links found among {checked} checked (of {discovered} discovered). This does not guarantee all links work.')
+            candidates = verified_wordpress_suggestions(broken) if broken else []
+            st.session_state['fg_scan_result'] = {
+                'start_url': url.strip(), 'rows': rows, 'broken': broken,
+                'checked': checked, 'discovered': discovered, 'candidates': candidates,
+            }
         except (ValueError, requests.RequestException) as exc:
             st.error(f'Could not scan: {exc}')
+
+result = st.session_state.get('fg_scan_result')
+if result is not None:
+    rows = result['rows']
+    broken = result['broken']
+    checked = result['checked']
+    discovered = result['discovered']
+    st.success(f'Scanned {len(rows)} pages')
+    a, b, c = st.columns(3)
+    a.metric('Pages', len(rows))
+    b.metric('Links checked', checked)
+    c.metric('Link issues', len(broken))
+    st.subheader('Page audit')
+    st.dataframe(rows, use_container_width=True, hide_index=True)
+    st.download_button('Download page audit CSV', to_csv(rows), 'filip_guard_pages.csv', 'text/csv')
+    st.subheader('Internal link issues')
+    st.subheader('AI Advisor - SEO Recommendations')
+    recommendations = analyze_pages(rows)
+    st.dataframe(recommendations, use_container_width=True, hide_index=True)
+    for page in rows:
+        if "Missing meta description" in str(page.get("issues", "")):
+            st.write(suggest_meta_description(page.get("title", "")))
+    if broken:
+        st.dataframe(broken, use_container_width=True, hide_index=True)
+        st.download_button('Download link issues CSV', to_csv(broken), 'filip_guard_links.csv', 'text/csv')
+        st.subheader('WordPress link replacement suggestions (read-only)')
+        candidates = result['candidates']
+        if candidates:
+            st.dataframe(candidates, use_container_width=True, hide_index=True)
+            st.caption('Candidates are reachable, but their relevance is not confirmed. Review before any change. No edits are made.')
+        else:
+            st.info('No verified WordPress replacement candidates found in the sampled public pages/posts.')
+    else:
+        st.info(f'No broken links found among {checked} checked (of {discovered} discovered). This does not guarantee all links work.')
+    render_public_wordpress_audit(rows, result['start_url'])
 
 st.caption('Beta: checks HTML SEO signals and internal links only. Not a complete SEO, performance or security audit. Scan sites you own or are authorized to audit.')
 render_wordpress_autofix_ui()
