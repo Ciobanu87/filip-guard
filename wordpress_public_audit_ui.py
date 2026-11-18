@@ -1,11 +1,11 @@
 """Optional Streamlit UI for a read-only WordPress audit.
 
-Call from the existing scan-result view after Scanner rows exist. The UI
-never runs a WordPress request without a user button click.
+Only a user click triggers the public WordPress inventory request.
 """
 from urllib.parse import urlsplit
 
 from wordpress_public_audit import build_public_wordpress_audit
+from wordpress_tls_diagnostics import classify_tls_failure
 
 
 def _hostname_from_scan(start_url, rows):
@@ -38,7 +38,12 @@ def render_public_wordpress_audit(rows, start_url, *, st_module=None):
         hostname = _hostname_from_scan(start_url, rows)
         report = build_public_wordpress_audit(hostname, rows, per_page=20, timeout=15)
     except (ValueError, OSError, TimeoutError) as exc:
-        st_module.warning('WordPress public inventory unavailable: ' + str(exc)[:160])
+        # Never display raw network errors, which may contain host/IP details.
+        if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
+            message = classify_tls_failure(exc)['message']
+        else:
+            message = 'The public WordPress inventory could not be validated or retrieved.'
+        st_module.warning('WordPress public inventory unavailable: ' + message)
         return None
     coverage = report['inventory_coverage']
     st_module.write('Public entries sampled:', coverage['inventory_count'])
