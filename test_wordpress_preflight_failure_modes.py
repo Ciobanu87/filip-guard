@@ -17,10 +17,10 @@ class PreflightFailureModeTests(unittest.TestCase):
         self.approvals = ApprovalStore(os.path.join(self.tmp.name, 'approvals.sqlite'))
         self.gate = OfflinePreflight(self.approvals, self.backups)
         self.params = dict(site_url='https://example.com', resource_id=7,
-                           user_id=9, current_content='old', proposed_content='new', now=101)
+                           user_id=9, current_content='old', proposed_content='new', now=101, session_id='a' * 43)
         self.approval = self.approvals.issue(site_url='https://example.com',
             resource_id=7, user_id=9, original_content='old', proposed_content='new',
-            trusted_authorization=True, now=100)
+            trusted_authorization=True, now=100, session_id='a' * 43)
 
     def test_failed_backup_write_does_not_consume_approval(self):
         with patch.object(self.backups, 'create_backup', side_effect=OSError('disk full')):

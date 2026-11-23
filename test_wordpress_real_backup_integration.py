@@ -20,12 +20,19 @@ class RealBackupIntegrationTests(unittest.TestCase):
         self.preflight = OfflinePreflight(self.approvals, self.backups)
         self.args = dict(site_url='https://example.com', resource_id=13,
                          user_id=4, current_content='<p>before</p>',
-                         proposed_content='<p>after</p>', now=1000)
+                         proposed_content='<p>after</p>', now=1000, session_id='a' * 43)
         self.approval = self.approvals.issue(
             site_url=self.args['site_url'], resource_id=13, user_id=4,
             original_content=self.args['current_content'],
             proposed_content=self.args['proposed_content'],
-            trusted_authorization=True, now=1000)
+            trusted_authorization=True, now=1000, session_id='a' * 43)
+
+    def test_wrong_session_cannot_create_backup(self):
+        with self.assertRaises(PermissionError):
+            self.preflight.prepare(self.approval, **(self.args | {'session_id': 'b' * 43}))
+        with test_db(self.backup_path) as db:
+            self.assertEqual(db.execute('SELECT count(*) FROM backups').fetchone()[0], 0)
+        self.preflight.prepare(self.approval, **self.args)
 
     def test_real_backup_verified_and_persists_after_reopen(self):
         result = self.preflight.prepare(self.approval, **self.args)

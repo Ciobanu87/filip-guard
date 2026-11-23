@@ -13,12 +13,13 @@ class OfflinePreflight:
         self.backups = backup_manager
 
     def prepare(self, approval, *, site_url, resource_id, user_id,
-                current_content, proposed_content, now=None):
+                current_content, proposed_content, now=None, session_id=None):
         from wordpress_execution_gate import verify_prewrite
         # Validate without consuming before persisting the original snapshot.
         verify_prewrite(approval, site_url=site_url, resource_id=resource_id,
                         user_id=user_id, current_content=current_content,
                         proposed_content=proposed_content, now=now)
+        self.approvals.verify_session_binding(approval, session_id)
         original_hash = sha256(current_content.encode('utf-8')).hexdigest()
         backup_id = self.backups.create_backup(site_url, resource_id, current_content)
         snapshot = self.backups.get_backup(backup_id)
@@ -33,7 +34,7 @@ class OfflinePreflight:
         result = self.approvals.consume_for_offline_review(
             approval, site_url=site_url, resource_id=resource_id, user_id=user_id,
             current_content=current_content, proposed_content=proposed_content,
-            now=now)
+            now=now, session_id=session_id)
         if result != {'approved_for_offline_review': True, 'changes_applied': False}:
             raise RuntimeError('Unexpected approval result')
         return {'status': 'offline_review_ready', 'backup_id': backup_id,

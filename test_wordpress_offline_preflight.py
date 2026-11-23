@@ -35,10 +35,10 @@ class OfflinePreflightTests(unittest.TestCase):
         self.backup = BackupManager(os.path.join(self.tmp.name, 'backups.db'))
         self.preflight = OfflinePreflight(self.store, self.backup)
         self.kw = dict(site_url='https://example.com', resource_id=10, user_id=7,
-                       current_content='original', proposed_content='revised', now=1000)
+                       current_content='original', proposed_content='revised', now=1000, session_id='a' * 43)
         self.approval = self.store.issue(site_url=self.kw['site_url'],
             resource_id=10, user_id=7, original_content='original',
-            proposed_content='revised', trusted_authorization=True, now=1000)
+            proposed_content='revised', trusted_authorization=True, now=1000, session_id='a' * 43)
 
     def test_success_read_only_with_verified_backup(self):
         result = self.preflight.prepare(self.approval, **self.kw)
