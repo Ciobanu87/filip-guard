@@ -13,12 +13,15 @@ from ai_advisor import analyze_pages, suggest_meta_description
 from link_resolver import suggest_replacements
 from wordpress_autofix_ui import render_wordpress_autofix_ui
 from wordpress_autofix_sandbox_ui import render_autofix_sandbox
+from customer_account_ui import render_customer_account
 from wordpress_public_audit_ui import render_public_wordpress_audit
 
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
 st.title('🛡️ FILIP GUARD')
 st.caption('Website Health & SEO • Beta')
 st.write('Audit up to 30 public pages, find basic SEO issues and check internal links.')
+
+render_customer_account()
 
 HEADERS = {'User-Agent': 'FilipGuardAudit/0.1 (+website-health-check)'}
 MAX_BYTES = 1_500_000
