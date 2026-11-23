@@ -6,7 +6,8 @@ No WordPress changes are performed here.
 """
 
 import hashlib
-import json
+import os
+from contextlib import contextmanager
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -27,8 +28,43 @@ class BackupManager:
                 )
             """)
 
+    @contextmanager
     def _connect(self):
-        return sqlite3.connect(self.database_path)
+        db = sqlite3.connect(self.database_path)
+        try:
+            with db:
+                yield db
+        finally:
+            db.close()
+
+    def export_verified_copy(self, destination):
+        """Create an independent SQLite snapshot, including committed WAL data.
+
+        Destination must not exist. The caller is responsible for secure,
+        durable off-host storage and encryption; this method does neither.
+        Hashes detect accidental corruption, not malicious database rewrites.
+        """
+        destination = os.fspath(destination)
+        # Exclusive creation also prevents clobbering the source or a symlink.
+        fd = os.open(destination, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        os.close(fd)
+        try:
+            with self._connect() as source:
+                target = sqlite3.connect(destination)
+                try:
+                    source.backup(target)
+                    if target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
+                        raise ValueError('Backup database integrity check failed.')
+                    identifiers = [row[0] for row in target.execute('SELECT backup_id FROM backups')]
+                finally:
+                    target.close()
+            independent = BackupManager(destination)
+            for backup_id in identifiers:
+                independent.get_backup(backup_id)
+            return {'backup_count': len(identifiers), 'verified': True}
+        except BaseException:
+            os.unlink(destination)
+            raise
 
     def create_backup(self, site_url, resource_id, content):
         if not isinstance(content, str):
