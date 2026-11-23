@@ -1,3 +1,5 @@
+"""Deterministic SEO recommendations. No AI model or external AI API is used."""
+
 def analyze_pages(rows):
     recommendations = []
 
@@ -5,7 +7,7 @@ def analyze_pages(rows):
         url = page.get("page", "")
         status = page.get("http_status")
 
-        if not isinstance(status, int) or status >= 400:
+        if type(status) is not int or not 200 <= status < 400:
             recommendations.append({
                 "page": url,
                 "problem": "Page unavailable or scan failed",
@@ -15,6 +17,11 @@ def analyze_pages(rows):
                 "priority": "High",
                 "autofix": False
             })
+            continue
+
+        # The scanner deliberately leaves SEO fields empty for non-HTML bodies.
+        # Those placeholders are not evidence of missing SEO metadata.
+        if page.get("issues") == "Non-HTML or empty page" or status in (204, 205, 206, 304):
             continue
 
         if not page.get("title"):

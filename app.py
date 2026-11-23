@@ -245,6 +245,7 @@ if result is not None:
     st.download_button('Download page audit CSV', to_csv(rows), 'filip_guard_pages.csv', 'text/csv')
     st.subheader('Internal link issues')
     st.subheader('AI Advisor - SEO Recommendations')
+    st.caption('Current recommendations use fixed SEO rules. No AI model is connected; suggested text is a template for human review.')
     recommendations = analyze_pages(rows)
     st.dataframe(recommendations, use_container_width=True, hide_index=True)
     for page in rows:
