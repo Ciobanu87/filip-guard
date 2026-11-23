@@ -36,3 +36,52 @@ sessions and per-operation approval UI, atomic server-side conditional edits,
 post-edit verification, remote rollback tests on an authorized WordPress fixture,
 and durable encrypted external backups. Monitoring follows validation of those
 components. No production launch has been performed.
+
+## AutoFix development integration (isolated fixture)
+
+The Streamlit app now includes an opt-in **AutoFix — isolated local test**.
+It accepts synthetic content only, displays the exact diff, requires a new
+explicit approval for each repair, creates and verifies a content backup, runs
+a conditional update, and checks the result. It never accepts real credentials
+or connects to a real WordPress installation. Its synthetic test files are
+intentionally temporary and are not production storage.
+
+`AutoFixEngine` persists proposals, session binding, approval metadata and
+operation outcomes in SQLite. Supported operation: reviewed content replacement
+for posts/pages only. The trusted server must supply authenticated user/session
+identity; this engine does not implement login. Tokens cannot cross proposal or
+resource-type boundaries. Stale content/revisions and consumed approvals fail
+closed. A later edit cannot be overwritten by conditional rollback. An uncertain
+write result is journaled and cannot be retried blindly; manual reconciliation
+is required. A process crash during application remains marked `applying` with
+the backup ID and an explicit recovery requirement.
+
+The default gateway always rejects live execution. `LocalWordPressFixture` is
+an isolated SQLite model of permission checks, idempotency and atomic
+compare-and-swap, not a WordPress implementation. A production gateway still
+needs an authenticated, authorized WordPress server endpoint that enforces the
+revision condition atomically. Do not substitute REST GET followed by a normal
+POST: that permits concurrent changes to be overwritten.
+
+The candidate Application Password identity exchange reuses the DNS-pinned,
+verified TLS transport and strict HTTP parser. Tests use only fictitious secrets
+and mocked connections; the public authentication entry and live repair UI remain
+disabled. No authorized WordPress installation has been used for integration
+validation in this session. Python cannot guarantee in-memory secret zeroization.
+
+## Encrypted external content-backup adapter
+
+`export_encrypted_copy(manager, store, key, key_id=...)` exports the content
+snapshot database, encrypts it with AES-256-GCM using a fresh nonce, uploads only
+ciphertext through an injected object store, then downloads, authenticates,
+decrypts and verifies an independent recovery copy before reporting success.
+`restore_encrypted_copy` can recover without Streamlit or the original database.
+It rejects wrong keys, modified data, unexpected object digests and existing
+output paths. Recovery files are created with private permissions.
+
+No actual external provider, credentials, backup schedule, retention policy or
+production key custody has been configured. Tests use an in-memory object store
+and ephemeral random keys. Deployment needs private durable external storage, an
+independently retained encryption key, a saved nonsecret export receipt and an
+operator-tested recovery procedure. These archives cover saved resource content,
+not themes, plugins, uploads, configuration or the complete WordPress database.

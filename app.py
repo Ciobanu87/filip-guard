@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from ai_advisor import analyze_pages, suggest_meta_description
 from link_resolver import suggest_replacements
 from wordpress_autofix_ui import render_wordpress_autofix_ui
+from wordpress_autofix_sandbox_ui import render_autofix_sandbox
 from wordpress_public_audit_ui import render_public_wordpress_audit
 
 st.set_page_config(page_title='FILIP GUARD | Website Health & SEO', page_icon='🛡️', layout='centered')
@@ -267,3 +268,5 @@ if result is not None:
 
 st.caption('Beta: checks HTML SEO signals and internal links only. Not a complete SEO, performance or security audit. Scan sites you own or are authorized to audit.')
 render_wordpress_autofix_ui()
+
+render_autofix_sandbox()
