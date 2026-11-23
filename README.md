@@ -85,3 +85,47 @@ and ephemeral random keys. Deployment needs private durable external storage, an
 independently retained encryption key, a saved nonsecret export receipt and an
 operator-tested recovery procedure. These archives cover saved resource content,
 not themes, plugins, uploads, configuration or the complete WordPress database.
+
+## Candidate real WordPress REST gateway and companion
+
+`WordPressRESTGateway` now connects the existing `AutoFixEngine` contract to the
+verified HTTPS transport. It authenticates `/wp-json/wp/v2/users/me`, checks the
+expected user and exact resource, and uses only the companion's authorized
+snapshot and conditional-update routes. Credentials are obtained transiently
+from a trusted server callback and never written to the repair journal. Requests
+are bounded; redirects and automatic retries are forbidden. A lost response is
+reported as an uncertain result, never as a successful repair or permission to
+retry. The legacy adapter, public authentication entry and default engine gateway
+remain disabled; this candidate is not connected to the client UI.
+
+`wordpress_companion/filip-guard-companion.php` implements the matching candidate
+REST endpoint for posts/pages. It is disabled by default and refuses production
+environments. Nothing in this repository installs or enables it on any site.
+It requires HTTPS, Application Password authentication, per-resource edit
+permission and an explicit nonproduction test activation constant. It rejects
+unsupported payload fields and content that fails WordPress's post HTML filter.
+The version covers the complete selected post row; one byte-exact conditional
+SQL update checks every original column, so a title/status/author/content change
+between read and write also prevents the update. A durable single-use operation
+reservation prevents a lost reply or pending operation from causing a repeat
+write. Rollback uses the same conditional endpoint with the post-write version.
+
+**Scope limitation:** this test-only endpoint changes `post_content` and modified
+timestamps directly. It does not run the complete `wp_update_post` hook lifecycle,
+create native WordPress revisions, update builder metadata, or validate external
+search/cache/SEO plugin integrations. It must not be marketed as general WordPress
+maintenance or enabled for customers without resolving and validating the required
+compatibility behavior. Existing content that fails the HTML filter cannot be
+restored through this endpoint; the engine reports restoration failure explicitly.
+Saved content backups are not full-site backups.
+
+Tests cover actual Python HTTP serialization/parsing with synthetic sockets and
+execute the PHP endpoint against controlled WordPress/wpdb API stubs. PHP lint
+and these endpoint tests run in GitHub Actions. These are not a real WordPress,
+MySQL/MariaDB, TLS-hosting or third-party-plugin integration test. Separate
+validation on an authorized nonproduction WordPress environment is still required.
+
+Protocol development references:
+- https://developer.wordpress.org/reference/hooks/application_password_did_authenticate/
+- https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/
+- https://developer.wordpress.org/reference/functions/wp_update_post/

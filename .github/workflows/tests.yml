@@ -24,6 +24,15 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up PHP for companion tests
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Verify PHP test runtime
+        run: php --version
+
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
