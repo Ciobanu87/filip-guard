@@ -39,7 +39,10 @@ class PublicAuditUITests(unittest.TestCase):
         self.st.warning.assert_called_once()
 
     def test_invalid_contexts(self):
-        for url in ('http://example.org', 'https://user@example.org', 'https://example.org:8443'):
+        for url in ('http://example.org', 'https://user@example.org',
+                    'https://example.org:8443', 'https://example.org/post',
+                    'https://example.org/?token=secret',
+                    'https://example.org/#fragment'):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 _hostname_from_scan(url, self.rows)
         with self.assertRaises(ValueError):
