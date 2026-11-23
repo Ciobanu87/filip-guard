@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import re
 import shutil
 import socket
 import ssl
@@ -36,7 +37,12 @@ def php_quote(value):
 
 
 class RealWordPress:
-    def __init__(self):
+    def __init__(self, hostname='fgwp.test', shared_database_port=None):
+        if not re.fullmatch(r'[a-z0-9-]+\.test', hostname):
+            raise ValueError('Only isolated .test fixture hostnames are allowed')
+        self.hostname = hostname
+        self.site_url = 'https://' + hostname
+        self.shared_database_port = shared_database_port
         self.stack = ExitStack()
         try:
             self._setup()
@@ -58,12 +64,14 @@ class RealWordPress:
         if (self.wp / 'wp-config.php').exists():
             raise RuntimeError('Only a clean WordPress source tree is allowed')
         self.database = 'fg_test_' + secrets.token_hex(6)
-        self.db_port = int(os.environ.get('FG_WP_DB_PORT', '3306'))
-        if os.environ.get('FG_WP_DB_SERVER'):
+        self.db_port = shared_port = self.shared_database_port
+        if shared_port is None:
+            self.db_port = int(os.environ.get('FG_WP_DB_PORT', '3306'))
+        if os.environ.get('FG_WP_DB_SERVER') and shared_port is None:
             self.start_database()
         self.create_database()
         self.configure_wordpress()
-        self.wpcli('core', 'install', '--url=https://fgwp.test', '--title=FILIP GUARD isolated fixture',
+        self.wpcli('core', 'install', '--url=' + self.site_url, '--title=FILIP GUARD isolated fixture',
                    '--admin_user=fg-admin', '--admin_email=fixture@example.invalid',
                    '--admin_password=' + secrets.token_urlsafe(32), '--skip-email')
         self.wpcli('option', 'update', 'permalink_structure', '/%postname%/')
@@ -78,6 +86,8 @@ class RealWordPress:
                                       '--role=editor', '--user_pass=' + secrets.token_urlsafe(24), '--porcelain'))
         self.subscriber_id = int(self.wpcli('user', 'create', 'fg-subscriber', 'subscriber@example.invalid',
                                           '--role=subscriber', '--user_pass=' + secrets.token_urlsafe(24), '--porcelain'))
+        self.admin_id = int(self.wpcli('user', 'get', 'fg-admin', '--field=ID'))
+        self.admin_password = self.wpcli('user', 'application-password', 'create', 'fg-admin', 'FG owner fixture', '--porcelain')
         self.editor_password = self.wpcli('user', 'application-password', 'create', 'fg-editor', 'FG integration', '--porcelain')
         self.subscriber_password = self.wpcli('user', 'application-password', 'create', 'fg-subscriber', 'FG integration', '--porcelain')
         self.start_servers()
@@ -149,7 +159,7 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
     def configure_wordpress(self):
         constants = dict(DB_NAME=self.database, DB_USER=self.db_user, DB_PASSWORD=self.db_password,
             DB_HOST='127.0.0.1:' + str(self.db_port), DB_CHARSET='utf8mb4', DB_COLLATE='',
-            WP_HOME='https://fgwp.test', WP_SITEURL='https://fgwp.test', WP_ENVIRONMENT_TYPE='staging')
+            WP_HOME=self.site_url, WP_SITEURL=self.site_url, WP_ENVIRONMENT_TYPE='staging')
         for key in ('AUTH_KEY','SECURE_AUTH_KEY','LOGGED_IN_KEY','NONCE_KEY','AUTH_SALT','SECURE_AUTH_SALT','LOGGED_IN_SALT','NONCE_SALT'):
             constants[key] = secrets.token_urlsafe(48)
         text = '<?php\n' + ''.join('define(' + php_quote(k) + ',' + php_quote(v) + ');\n' for k,v in constants.items())
@@ -164,11 +174,11 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.x509.oid import NameOID
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'fgwp.test')])
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, self.hostname)])
         now = datetime.now(timezone.utc)
         cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(now-timedelta(minutes=1))
-            .not_valid_after(now+timedelta(hours=2)).add_extension(x509.SubjectAlternativeName([x509.DNSName('fgwp.test')]),False)
+            .not_valid_after(now+timedelta(hours=2)).add_extension(x509.SubjectAlternativeName([x509.DNSName(self.hostname)]),False)
             .add_extension(x509.BasicConstraints(ca=True,path_length=0),True).sign(key,hashes.SHA256()))
         certfile,keyfile=self.root/'fixture.crt',self.root/'fixture.key'
         certfile.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
@@ -193,7 +203,7 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
                 upstream=http.client.HTTPConnection('127.0.0.1',fixture.http_port,timeout=15)
                 try:
                     upstream.request(self.command,self.path,body=body,
-                        headers={**dict(self.headers),'Host':'fgwp.test','Connection':'close'})
+                        headers={**dict(self.headers),'Host':fixture.hostname,'Connection':'close'})
                     response=upstream.getresponse(); data=response.read()
                     self.send_response(response.status)
                     for k,v in response.getheaders():
@@ -236,7 +246,7 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
         raise RuntimeError('Isolated PHP server restart timeout')
 
     def connector(self, hostname, timeout=15):
-        if hostname != 'fgwp.test': raise ValueError('Unexpected local fixture hostname')
+        if hostname != self.hostname: raise ValueError('Unexpected local fixture hostname')
         raw=socket.create_connection(('127.0.0.1',self.tls_port),timeout=timeout)
         connection = self.client_context.wrap_socket(raw,server_hostname=hostname)
         fixture = self
@@ -277,11 +287,12 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
                 return connection.recv(size)
         return FaultSocket()
 
-    def gateway(self, subscriber=False, wrong=False):
-        if subscriber: provider=lambda:('fg-subscriber',self.subscriber_password)
+    def gateway(self, subscriber=False, wrong=False, owner=False):
+        if owner: provider=lambda:('fg-admin',self.admin_password)
+        elif subscriber: provider=lambda:('fg-subscriber',self.subscriber_password)
         elif wrong: provider=lambda:('fg-editor','fictitious-invalid-password')
         else: provider=lambda:('fg-editor',self.editor_password)
-        return WordPressRESTGateway('https://fgwp.test',provider)
+        return WordPressRESTGateway(self.site_url,provider)
 
     def post(self):
         return int(self.wpcli('post','create','--post_type=post','--post_status=publish',
@@ -459,6 +470,59 @@ class RealWordPressTests(unittest.TestCase):
             with self.assertRaises(WordPressRESTError):
                 self.snapshot()
         self.assertEqual(self.fixture.request_count, count)
+
+    def test_real_site_ownership_requires_administrative_capability(self):
+        with self.assertRaises(PermissionError):
+            self.gateway.verify_site_owner()
+        self.assertEqual(self.fixture.gateway(owner=True).verify_site_owner(), self.fixture.admin_id)
+
+    def test_real_two_customers_two_wordpress_sites_and_verified_backup_gate(self):
+        from customer_auth import CustomerAuth, AuthenticationError
+        from customer_sites import CustomerSites
+        from test_verified_external_backups import MemoryStore
+        other = RealWordPress('fgwp-two.test', shared_database_port=self.fixture.db_port)
+        self.addCleanup(other.close)
+        def connector(hostname, timeout=15):
+            target = self.fixture if hostname == self.fixture.hostname else other
+            return target.connector(hostname, timeout)
+        with patch('wordpress_secure_https.create_verified_connection', side_effect=connector):
+            root = Path(self.temp.name)
+            auth = CustomerAuth(root / 'customers.sqlite')
+            auth.register('alice', 'Alice-real-fixture-password')
+            auth.register('bob', 'Bob-real-fixture-password')
+            alice = auth.login('alice', 'Alice-real-fixture-password')
+            bob = auth.login('bob', 'Bob-real-fixture-password')
+            master = secrets.token_bytes(32)
+            simulated_store = MemoryStore()
+            service = CustomerSites(auth, root / 'workspaces', lambda _: master,
+                active_key_id='real-fixture-ephemeral', object_store=simulated_store,
+                gateway_factory=WordPressRESTGateway)
+            site_a = service.connect(alice, self.fixture.site_url, 'fg-admin', self.fixture.admin_password)['site_id']
+            site_b = service.connect(bob, other.site_url, 'fg-admin', other.admin_password)['site_id']
+            post_b = other.post()
+            plans = []
+            for token, site_id, post_id in ((alice, site_a, self.post_id), (bob, site_b, post_b)):
+                plan = service.propose(token, site_id, 'post', post_id, '<p>Customer reviewed replacement</p>')['plan_id']
+                approval = service.approve(token, site_id, plan, confirmed=True)
+                plans.append((plan, approval))
+            with self.assertRaises(PermissionError):
+                service.review(bob, site_a, plans[0][0])
+            with self.assertRaises(PermissionError):
+                service.apply(bob, site_b, plans[1][0], plans[0][1])
+            simulated_store.fail = 'corrupt'
+            from wordpress_encrypted_backup import EncryptedBackupError
+            with self.assertRaises(EncryptedBackupError):
+                service.apply(alice, site_a, *plans[0])
+            self.assertEqual(self.snapshot().content, '<p>Original</p>')
+            simulated_store.fail = None
+            results = [service.apply(alice, site_a, *plans[0]), service.apply(bob, site_b, *plans[1])]
+            self.assertTrue(all(result['status'] == 'applied' for result in results))
+            self.assertEqual(service.get_backup(alice, site_a, results[0]['backup_id'])['content'], '<p>Original</p>')
+            with self.assertRaises(PermissionError):
+                service.get_backup(bob, site_b, results[0]['backup_id'])
+            auth.logout(alice)
+            with self.assertRaises(AuthenticationError):
+                service.apply(alice, site_a, *plans[0])
 
     def test_real_conditional_restore_and_idempotency(self):
         original=self.snapshot()

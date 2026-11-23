@@ -32,7 +32,7 @@ separately. Passing this suite does not demonstrate compatibility with arbitrary
 WordPress plugins, page builders, multisite or hosting-specific behavior.
 
 
-The real suite contains 15 tests. It uses a fixture-only MU-plugin to observe real
+The real suite contains 17 tests. It uses a fixture-only MU-plugin to observe real
 save hooks and to inject a deterministic title change immediately before the SQL
 CAS. Another fixture hook changes a title during save; the companion must report
 uncertainty rather than success. No marketplace plugin compatibility is claimed.
@@ -46,3 +46,10 @@ Configuration-gate cases restart the isolated PHP process and assert the effecti
 WordPress environment/activation constant through a fixture-only authenticated
 diagnostic route. This avoids relying on runtime opcode/stat-cache refresh when
 changing boot-time configuration and does not weaken the companion's gate.
+
+
+The suite additionally creates a second clean WordPress installation on the same
+disposable SQL server, with a distinct .test hostname and TLS certificate. It uses
+two customer accounts to verify administrative site proof, separate workspaces,
+scoped credentials/backups, rejected cross-account approvals and blocked writes
+when the simulated external archive is corrupt. Object storage remains simulated.

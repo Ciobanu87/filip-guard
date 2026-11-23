@@ -120,6 +120,20 @@ class WordPressRESTGateway:
             raise WordPressRESTError('Invalid authorized WordPress resource snapshot')
         return ResourceSnapshot(self.site_url, kind, resource_id, data['content'], data['version'])
 
+    def verify_site_owner(self):
+        """Require authenticated site-administration capability for initial binding."""
+        response, _ = self._request('/wp-json/wp/v2/users/me')
+        try:
+            identity = inspect_identity_response(response)
+        except ValueError:
+            raise WordPressRESTError('Invalid WordPress identity response') from None
+        _, proof = self._request('/wp-json/filip-guard/v1/ownership')
+        if (proof.get('protocol') != 'filip-guard-cas-v1'
+                or type(proof.get('user_id')) is not int or proof['user_id'] != identity.user_id
+                or proof.get('can_manage_site') is not True):
+            raise PermissionError('Verified site-administration capability required')
+        return identity.user_id
+
     def read_authorized(self, site, kind, resource_id, user_id):
         path = self._target(site, kind, resource_id, user_id)
         self._identity(user_id)

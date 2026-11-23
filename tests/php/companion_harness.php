@@ -36,7 +36,7 @@ function is_wp_error($value) { return $value instanceof WP_Error; }
 function wp_get_environment_type() { return $GLOBALS['env']; }
 function is_ssl() { return $GLOBALS['ssl']; }
 function get_current_user_id() { return 7; }
-function current_user_can($capability, $id) { return $GLOBALS['can_edit'] && $capability === 'edit_post' && $id === 10; }
+function current_user_can($capability, $id = null) { return $GLOBALS['can_edit'] && $capability === 'edit_post' && $id === 10; }
 function clean_post_cache($id) {}
 function wp_json_encode($value) { return json_encode($value); }
 function current_time($format, $gmt = false) { return '2026-11-23 20:00:00'; }
@@ -56,6 +56,7 @@ function update_option($name, $value, $autoload) {
 function add_action($hook, $callback, $priority = 10, $count = 1) { $GLOBALS['actions'][$hook] = $callback; }
 function register_rest_route($namespace, $route, $endpoints) {
     check($namespace === 'filip-guard/v1', 'namespace');
+    if ($route === '/ownership') { check(isset($endpoints['permission_callback']), 'ownership permissions'); return; }
     check(count($endpoints) === 2, 'GET and POST registered');
     foreach ($endpoints as $endpoint) { check(isset($endpoint['permission_callback']), 'permission callback'); }
 }

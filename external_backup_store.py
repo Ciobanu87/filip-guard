@@ -88,7 +88,10 @@ def configured_s3_store(config, credential_provider):
     if type(config) is not S3BackupConfig or not callable(credential_provider):
         raise ValueError('Explicit trusted configuration and credentials required')
     config.validate()
-    credentials=credential_provider()
+    try:
+        credentials=credential_provider()
+    except Exception:
+        raise ObjectStoreError('Object-store credentials unavailable') from None
     if (type(credentials) is not tuple or len(credentials) not in (2,3)
             or any(type(value) is not str or not value for value in credentials)):
         raise ValueError('Explicit object-store credentials required')

@@ -38,7 +38,7 @@ final class Filip_Guard_Companion {
         return array($kind, (int) $raw_id);
     }
 
-    public static function permission($request) {
+    private static function authenticated() {
         if (!defined('FILIP_GUARD_TEST_REPAIRS') || FILIP_GUARD_TEST_REPAIRS !== true
             || !in_array(wp_get_environment_type(), array('local', 'development', 'staging'), true)) {
             return self::error('fg_disabled', 403);
@@ -50,6 +50,12 @@ final class Filip_Guard_Companion {
         if ($user_id <= 0 || self::$application_user_id !== $user_id) {
             return self::error('fg_application_password_required', 401);
         }
+        return true;
+    }
+
+    public static function permission($request) {
+        $authenticated = self::authenticated();
+        if ($authenticated !== true) { return $authenticated; }
         $target = self::target($request);
         if (is_wp_error($target)) {
             return $target;
@@ -59,6 +65,19 @@ final class Filip_Guard_Companion {
             return self::error('fg_forbidden', 403);
         }
         return true;
+    }
+
+    public static function ownership_permission($request) {
+        $authenticated = self::authenticated();
+        if ($authenticated !== true) { return $authenticated; }
+        return current_user_can('manage_options') ? true : self::error('fg_site_owner_required', 403);
+    }
+
+    public static function ownership($request) {
+        $permission = self::ownership_permission($request);
+        if ($permission !== true) { return $permission; }
+        return self::response(array('protocol' => 'filip-guard-cas-v1',
+            'user_id' => get_current_user_id(), 'can_manage_site' => true));
     }
 
     private static function row($kind, $id) {
@@ -226,6 +245,10 @@ final class Filip_Guard_Companion {
     }
 
     public static function routes() {
+        register_rest_route('filip-guard/v1', '/ownership', array(
+            'methods' => 'GET', 'callback' => array(__CLASS__, 'ownership'),
+            'permission_callback' => array(__CLASS__, 'ownership_permission'),
+        ));
         register_rest_route('filip-guard/v1', '/resources/(?P<kind>post|page)/(?P<id>[1-9][0-9]{0,9})', array(
             array('methods' => 'GET', 'callback' => array(__CLASS__, 'read'),
                 'permission_callback' => array(__CLASS__, 'permission')),

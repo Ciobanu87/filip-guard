@@ -145,7 +145,7 @@ a real SQL database, and verified local TLS. No third-party website is used.
 Local runs use PHP 8.4/MariaDB 11.8.9; the separate GitHub Actions job uses
 PHP 8.3/MySQL 8.0.36. See `tests/real_wordpress/README.md` for reproduction.
 
-The 15 real integration tests cover identity, resource permissions and revocation,
+The 17 real integration tests cover identity, resource permissions and revocation,
 approved backup/write/verification, conditional restoration/idempotency, concurrent
 title changes and an injected edit immediately before the actual SQL CAS,
 native revisions and core save hooks, a mutating fixture plugin, draft pages,
@@ -153,3 +153,54 @@ disabled/production guards, untrusted TLS, lost/truncated replies, rollback afte
 verification failure and explicit rollback failure/conflict. Network faults are
 injected around actual WordPress requests; they are not claimed as a hosting outage.
 The companion remains test-only and production execution stays disabled.
+
+
+## Customer identity, site isolation and required external backup
+
+`CustomerAuth` provides salted scrypt password hashes, opaque server-held sessions
+stored as digests, absolute/idle expiry, logout, account login throttling and
+password-change revocation. Local usernames are account identifiers, not verified
+email addresses. Public signup is off by default. The existing scanner/Advisor
+remain accessible without enabling customer repair access.
+
+The account UI is configured only when the operator supplies `FG_CUSTOMER_AUTH_DB`.
+`FG_CUSTOMER_REGISTRATION=1` explicitly enables local signup for an authorized
+development deployment. No such deployment or personal account was configured in
+this work. Login credentials are not placed in URLs, browser local storage, logs
+or the repair journal. Logout clears customer UI state. Real deployment still
+needs TLS/session operational review, recovery and signup-abuse controls.
+
+`CustomerSites` is the trusted service boundary. It resolves the customer from
+the session for every operation; callers never choose a customer ID. A site can
+be bound only after the companion verifies Application Password authentication
+and `manage_options`. Another customer's site binding cannot be overwritten.
+WordPress numeric user/resource IDs are scoped to the verified site; customer IDs
+are independent opaque UUIDs. Default site connection/execution remains disabled
+unless trusted server code injects the REST gateway. No customer repair UI is enabled.
+
+Credentials use AES-GCM with owner/site/origin/WordPress-user associated data.
+Credential and content-backup keys are derived separately for each customer/site
+from an externally supplied versioned master key. No master key is generated or
+saved for deployment. Keep old key versions independently recoverable. Private
+workspaces and database files isolate plans, approvals, snapshots and receipts.
+A new login cannot inherit approvals from an earlier session.
+
+`VerifiedExternalBackups` integrates the encrypted archive adapter into the
+existing repair engine. It verifies upload readback and re-downloads/decrypts the
+exact resource archive before approval consumption or a write. Missing storage,
+lost connections, corrupt archives and unavailable keys block execution. Receipts
+survive Streamlit sessions; recovery works without the original snapshot database.
+Namespaces and keys prevent swapping archives across customers/sites.
+
+`S3ObjectStore` supports operator-configured HTTPS S3-compatible storage with
+explicit credentials, bounded streams, one request attempt and sanitized failures.
+It does not use ambient AWS credentials. Tests use botocore response stubs and an
+in-memory object store. **No real external backup provider, bucket, service
+credentials, production key custody, schedule or retention was configured or
+validated.** Saved resource content is still not a full WordPress site backup.
+
+Two real isolated WordPress installations with the same numeric administrator ID
+are now exercised through customer sessions and ownership verification. The real
+suite proves denied cross-customer access and that a corrupt simulated external
+archive prevents an actual WordPress write. The external storage in that scenario
+is explicitly simulated; WordPress/TLS/SQL are real.
