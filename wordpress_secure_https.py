@@ -208,6 +208,17 @@ def _https_get_exchange(hostname, path, timeout, *, headers=(), authorization=No
     Authorization is built only by the dedicated credential validator. Generic
     caller-supplied headers continue to forbid credentials and Host overrides.
     """
+    return _https_request_exchange(hostname, path, timeout, headers=headers,
+                                   authorization=authorization)
+
+
+def _https_request_exchange(hostname, path, timeout, *, headers=(), authorization=None,
+                            method='GET', body=b''):
+    """Bounded internal JSON GET/POST exchange; no redirect, retry or downgrade."""
+    if method not in ('GET', 'POST') or type(body) is not bytes:
+        raise ValueError('Unsupported HTTPS request')
+    if (method == 'GET' and body) or len(body) > 1_100_000:
+        raise ValueError('Invalid HTTPS request body')
     host_header = _validate_request(hostname, path, timeout)
     if authorization is not None and (
             not isinstance(authorization, str) or len(authorization) > 2048
@@ -226,17 +237,18 @@ def _https_get_exchange(hostname, path, timeout, *, headers=(), authorization=No
 
     try:
         request = (
-            f"GET {path} HTTP/1.1\r\n"
+            f"{method} {path} HTTP/1.1\r\n"
             f"Host: {host_header}\r\n"
             "Accept: application/json\r\n"
             "Accept-Encoding: identity\r\n"
             "Connection: close\r\n"
             + (f"Authorization: {authorization}\r\n" if authorization is not None else "")
+            + (f"Content-Type: application/json\r\nContent-Length: {len(body)}\r\n" if method == 'POST' else "")
             + "".join(f"{name}: {value}\r\n" for name, value in safe_headers)
             + "\r\n"
         )
         remaining_timeout()
-        connection.sendall(request.encode("ascii"))
+        connection.sendall(request.encode("ascii") + body)
         raw = bytearray()
         header_end = -1
         while True:
