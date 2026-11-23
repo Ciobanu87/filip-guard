@@ -25,3 +25,16 @@ add_filter('query', function($sql) {
     }
     return $sql;
 });
+
+// Fixture diagnostics expose no credentials and are never installed outside tests.
+add_action('rest_api_init', function() {
+    register_rest_route('fg-fixture/v1', '/runtime', array(
+        'methods' => 'GET',
+        'permission_callback' => function() { return current_user_can('edit_posts'); },
+        'callback' => function() {
+            return array('enabled' => defined('FILIP_GUARD_TEST_REPAIRS') && FILIP_GUARD_TEST_REPAIRS === true,
+                'environment' => wp_get_environment_type(), 'sapi' => PHP_SAPI,
+                'opcache' => ini_get('opcache.enable'));
+        },
+    ));
+});

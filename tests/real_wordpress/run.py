@@ -178,8 +178,9 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
         router=self.root/'router.php'
         router.write_text("<?php $_SERVER['HTTPS']='on'; $_SERVER['SERVER_PORT']='443'; require "+php_quote(self.wp/'index.php')+";\n")
         log=self.stack.enter_context(open(self.root/'php-server.log','w'))
-        process=subprocess.Popen(self.php_args+['-S','127.0.0.1:'+str(self.http_port),'-t',str(self.wp),str(router)],stdout=log,stderr=log)
-        self.stack.callback(self.stop_process,process)
+        self.php_server_command = self.php_args + ['-S', '127.0.0.1:' + str(self.http_port), '-t', str(self.wp), str(router)]
+        self.php_server_log = log
+        self.restart_php_server()
         fixture=self
         class Proxy(BaseHTTPRequestHandler):
             protocol_version='HTTP/1.1'
@@ -213,6 +214,26 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
             try:
                 with socket.create_connection(('127.0.0.1',self.http_port),timeout=.2):break
             except OSError:time.sleep(.05)
+
+    def restart_php_server(self):
+        # Configuration constants are boot-time settings. Use a fresh PHP process
+        # instead of depending on a running server's opcode/stat cache refresh.
+        previous = getattr(self, 'php_server', None)
+        if previous is not None:
+            self.stop_process(previous)
+        process = subprocess.Popen(self.php_server_command,
+                                   stdout=self.php_server_log, stderr=self.php_server_log)
+        self.php_server = process
+        self.stack.callback(self.stop_process, process)
+        for _ in range(100):
+            if process.poll() is not None:
+                raise RuntimeError('Isolated PHP server failed to restart')
+            try:
+                with socket.create_connection(('127.0.0.1', self.http_port), timeout=.2):
+                    return
+            except OSError:
+                time.sleep(.05)
+        raise RuntimeError('Isolated PHP server restart timeout')
 
     def connector(self, hostname, timeout=15):
         if hostname != 'fgwp.test': raise ValueError('Unexpected local fixture hostname')
@@ -405,15 +426,24 @@ class RealWordPressTests(unittest.TestCase):
     def test_real_disabled_and_production_gates(self):
         config = self.fixture.wp / 'wp-config.php'
         original = config.read_text()
-        for text in (original.replace("define('FILIP_GUARD_TEST_REPAIRS',true)",
-                                      "define('FILIP_GUARD_TEST_REPAIRS',false)"),
-                     original.replace("'staging'", "'production'")):
-            config.write_text(text)
-            try:
-                with self.assertRaises(PermissionError):
-                    self.snapshot()
-            finally:
-                config.write_text(original)
+        cases = (
+            ('disabled', original.replace("define('FILIP_GUARD_TEST_REPAIRS',true)",
+                                          "define('FILIP_GUARD_TEST_REPAIRS',false)"), False, 'staging'),
+            ('production', original.replace("'staging'", "'production'"), True, 'production'),
+        )
+        for mode, text, enabled, environment in cases:
+            with self.subTest(mode=mode):
+                config.write_text(text)
+                self.fixture.restart_php_server()
+                try:
+                    _, effective = self.gateway._request('/wp-json/fg-fixture/v1/runtime')
+                    self.assertEqual(effective['enabled'], enabled, effective)
+                    self.assertEqual(effective['environment'], environment, effective)
+                    with self.assertRaises(PermissionError):
+                        self.snapshot()
+                finally:
+                    config.write_text(original)
+                    self.fixture.restart_php_server()
         self.assertEqual(self.snapshot().content, '<p>Original</p>')
 
     def test_real_untrusted_tls_certificate_rejected_before_http_credentials(self):

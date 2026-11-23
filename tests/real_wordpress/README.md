@@ -40,3 +40,9 @@ Socket wrappers inject lost/truncated replies after the real server has processe
 the request, including restoration failures. Native WordPress revisions and
 post_updated/save_post/wp_after_insert_post events are checked against the real
 WordPress APIs and SQL database.
+
+
+Configuration-gate cases restart the isolated PHP process and assert the effective
+WordPress environment/activation constant through a fixture-only authenticated
+diagnostic route. This avoids relying on runtime opcode/stat-cache refresh when
+changing boot-time configuration and does not weaken the companion's gate.
