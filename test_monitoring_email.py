@@ -122,3 +122,25 @@ class EmailQueueTests(unittest.TestCase):
         self.sender.send.assert_not_called()
         with self.fixture.monitor.db() as db:state=db.execute('SELECT state FROM monitor_email_outbox').fetchone()[0]
         self.assertEqual(state,'expired')
+
+    def test_concurrent_dispatcher_startup_migrates_schema_once(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        with self.fixture.monitor.db() as db:
+            db.execute('ALTER TABLE monitor_email_outbox DROP COLUMN attempted_at')
+        barrier=Barrier(8)
+        def start(_):
+            barrier.wait()
+            return MonitoringEmailDispatcher(self.fixture.monitor)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            self.assertEqual(len(list(pool.map(start,range(8)))),8)
+        with self.fixture.monitor.db() as db:
+            columns=[row[1] for row in db.execute('PRAGMA table_info(monitor_email_outbox)')]
+        self.assertEqual(columns.count('attempted_at'),1)
+
+    def test_concurrent_dispatchers_cannot_send_same_notification_twice(self):
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results=list(pool.map(lambda _:self.dispatcher.dispatch_once(now=3600),range(8)))
+        self.assertEqual(sum(result['sent'] for result in results),1)
+        self.sender.send.assert_called_once()

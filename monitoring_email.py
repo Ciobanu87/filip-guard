@@ -100,6 +100,7 @@ class MonitoringEmailDispatcher:
     def __init__(self,monitor,*,sender=None,recipient_resolver=None):
         self.monitor,self.sender,self.recipients=monitor,sender,recipient_resolver
         with monitor.db() as db:
+            db.execute('BEGIN IMMEDIATE')
             columns={row[1] for row in db.execute('PRAGMA table_info(monitor_email_outbox)')}
             if 'attempted_at' not in columns:db.execute('ALTER TABLE monitor_email_outbox ADD COLUMN attempted_at REAL')
 
