@@ -123,6 +123,8 @@ def parse_http_response(raw):
     if not match:
         raise InvalidHTTPResponse("Invalid or unsupported HTTP status line.")
     status = int(match[1])
+    if status == 206:
+        raise InvalidHTTPResponse("Partial HTTP responses are not supported.")
     if 300 <= status < 400:
         raise InvalidHTTPResponse("HTTP redirects are disabled.")
     if len(lines) - 1 > MAX_HEADER_COUNT:
