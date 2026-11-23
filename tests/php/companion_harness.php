@@ -11,6 +11,13 @@ $GLOBALS['options'] = array();
 $GLOBALS['actions'] = array();
 $GLOBALS['fail_update_option'] = false;
 
+class WP_Post {
+    public $post_status;
+    public function __construct($row) { $this->post_status = $row->post_status; }
+}
+function wp_transition_post_status($new, $old, $post) { $GLOBALS['save_hooks'][] = 'transition_post_status'; }
+function do_action($hook, ...$args) { $GLOBALS['save_hooks'][] = $hook; }
+function wp_after_insert_post($post, $update, $before) { $GLOBALS['save_hooks'][] = 'wp_after_insert_post'; }
 class WP_Error {
     public function __construct(public $code, public $message, public $data) {}
 }
@@ -191,6 +198,9 @@ if ($scenario === 'invalid_payload') {
     $written = Filip_Guard_Companion::update(new Request($data));
     check($written instanceof WP_REST_Response, 'successful write receipt');
     check($written->data['content'] === '<p>Updated</p>', 'updated content');
+    foreach (array('post_updated','save_post','wp_after_insert_post') as $hook) {
+        check(in_array($hook, $GLOBALS['save_hooks'], true), 'core save lifecycle ' . $hook);
+    }
     check($written->data['version'] !== $read->data['version'], 'version changed');
     $replay = Filip_Guard_Companion::update(new Request($data));
     check($replay->data === $written->data && $wpdb->queries === 1, 'exact replay has no write');

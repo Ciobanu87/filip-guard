@@ -8,8 +8,8 @@
  *
  * Not production-ready. Only post_content and modified timestamps are changed.
  * A single byte-exact conditional SQL UPDATE prevents stale-row overwrites.
- * This deliberately does not emulate wp_update_post hooks, revision history,
- * search indexing, page-builder metadata or third-party plugin integrations.
+ * Runs core after-update/save actions for content revisions and hook consumers.
+ * Input filters, builder metadata and arbitrary plugin compatibility are not guaranteed.
  */
 if (!defined('ABSPATH')) {
     exit;
@@ -195,7 +195,29 @@ final class Filip_Guard_Companion {
         if (is_wp_error($observed) || self::version($observed) !== self::version($new_row)) {
             return self::error('fg_outcome_unknown', 409);
         }
-        $receipt = self::snapshot($observed);
+        // Preserve the atomic SQL guard, then run the core after-update lifecycle.
+        // Input filters/metadata updates are not emulated: only reviewed raw content
+        // passing wp_kses_post is supported. Any callback mutation invalidates receipt.
+        try {
+            $before_post = new WP_Post((object) $row);
+            $after_post = new WP_Post((object) $observed);
+            wp_transition_post_status($after_post->post_status, $before_post->post_status, $after_post);
+            do_action("edit_post_{$kind}", $id, $after_post);
+            do_action('edit_post', $id, $after_post);
+            do_action('post_updated', $id, $after_post, $before_post);
+            do_action("save_post_{$kind}", $id, $after_post, true);
+            do_action('save_post', $id, $after_post, true);
+            do_action('wp_insert_post', $id, $after_post, true);
+            wp_after_insert_post($after_post, true, $before_post);
+        } catch (Throwable $error) {
+            return self::error('fg_outcome_unknown', 503);
+        }
+        clean_post_cache($id);
+        $after_hooks = self::row($kind, $id);
+        if (is_wp_error($after_hooks) || self::version($after_hooks) !== self::version($new_row)) {
+            return self::error('fg_outcome_unknown', 409);
+        }
+        $receipt = self::snapshot($after_hooks);
         if (is_wp_error($receipt) || !update_option($option,
             array('digest' => $digest, 'state' => 'complete', 'receipt' => $receipt), false)) {
             return self::error('fg_outcome_unknown', 503);

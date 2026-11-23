@@ -28,13 +28,13 @@ corruption; they do not authenticate records against malicious modification.
 To recover locally, open the exported file with `BackupManager(new_path)` and
 retrieve the required `backup_id` with `get_backup`. Automated tests recover
 content after deleting the original database. This is database recovery only;
-remote WordPress rollback is not yet implemented or validated.
+remote WordPress rollback is implemented and tested only in isolated fixtures;
+production activation remains blocked.
 
 Before commercial launch, the project still needs scanner transport hardening,
-end-to-end authenticated WordPress integration, resource permissions, trusted user
-sessions and per-operation approval UI, atomic server-side conditional edits,
-post-edit verification, remote rollback tests on an authorized WordPress fixture,
-and durable encrypted external backups. Monitoring follows validation of those
+production login/session integration and approved repair UI, durable encrypted
+external storage/key custody, wider WordPress compatibility validation, and a
+separate production activation review. Monitoring follows validation of those
 components. No production launch has been performed.
 
 ## AutoFix development integration (isolated fixture)
@@ -66,8 +66,8 @@ POST: that permits concurrent changes to be overwritten.
 The candidate Application Password identity exchange reuses the DNS-pinned,
 verified TLS transport and strict HTTP parser. Tests use only fictitious secrets
 and mocked connections; the public authentication entry and live repair UI remain
-disabled. No authorized WordPress installation has been used for integration
-validation in this session. Python cannot guarantee in-memory secret zeroization.
+disabled. A disposable WordPress installation is now exercised by the separate real
+integration suite described below; client activation remains disabled. Python cannot guarantee in-memory secret zeroization.
 
 ## Encrypted external content-backup adapter
 
@@ -111,9 +111,11 @@ reservation prevents a lost reply or pending operation from causing a repeat
 write. Rollback uses the same conditional endpoint with the post-write version.
 
 **Scope limitation:** this test-only endpoint changes `post_content` and modified
-timestamps directly. It does not run the complete `wp_update_post` hook lifecycle,
-create native WordPress revisions, update builder metadata, or validate external
-search/cache/SEO plugin integrations. It must not be marketed as general WordPress
+timestamps directly. After the atomic update it runs core status/edit/post-updated/save/after-insert
+actions and creates native WordPress revisions. It does not emulate all
+`wp_update_post` input filters, update builder metadata, or guarantee arbitrary
+search/cache/SEO plugin compatibility. A callback that changes the selected post
+row invalidates the receipt, preserving an explicit uncertain outcome. It must not be marketed as general WordPress
 maintenance or enabled for customers without resolving and validating the required
 compatibility behavior. Existing content that fails the HTML filter cannot be
 restored through this endpoint; the engine reports restoration failure explicitly.
@@ -125,11 +127,29 @@ integration suite sends the Python engine/gateway requests through the actual PH
 companion handlers over a local subprocess bridge, exercising application,
 concurrent title changes, permission revocation, lost replies and conditional
 rollback. No socket listener or real WordPress database is used. PHP lint
-and these endpoint tests run in GitHub Actions. These are not a real WordPress,
-MySQL/MariaDB, TLS-hosting or third-party-plugin integration test. Separate
-validation on an authorized nonproduction WordPress environment is still required.
+and these endpoint tests run in GitHub Actions. Those simulated tests are supplemented by the separate disposable real
+WordPress/MySQL/MariaDB suite described below. Hosting-specific behavior and
+arbitrary third-party plugins still require separate compatibility validation.
 
 Protocol development references:
 - https://developer.wordpress.org/reference/hooks/application_password_did_authenticate/
 - https://developer.wordpress.org/rest-api/extending-the-rest-api/adding-custom-endpoints/
 - https://developer.wordpress.org/reference/functions/wp_update_post/
+
+
+## Real WordPress integration validation
+
+`tests/real_wordpress/run.py` provisions a clean disposable WordPress 7.1.5
+installation with generated users/Application Passwords, the actual companion,
+a real SQL database, and verified local TLS. No third-party website is used.
+Local runs use PHP 8.4/MariaDB 11.8.9; the separate GitHub Actions job uses
+PHP 8.3/MySQL 8.0.36. See `tests/real_wordpress/README.md` for reproduction.
+
+The 15 real integration tests cover identity, resource permissions and revocation,
+approved backup/write/verification, conditional restoration/idempotency, concurrent
+title changes and an injected edit immediately before the actual SQL CAS,
+native revisions and core save hooks, a mutating fixture plugin, draft pages,
+disabled/production guards, untrusted TLS, lost/truncated replies, rollback after
+verification failure and explicit rollback failure/conflict. Network faults are
+injected around actual WordPress requests; they are not claimed as a hosting outage.
+The companion remains test-only and production execution stays disabled.

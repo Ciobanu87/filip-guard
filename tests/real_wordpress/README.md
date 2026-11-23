@@ -30,3 +30,13 @@ are not disabled or configured to permit private addresses.
 Tests are separate from ordinary offline unit discovery and are reported
 separately. Passing this suite does not demonstrate compatibility with arbitrary
 WordPress plugins, page builders, multisite or hosting-specific behavior.
+
+
+The real suite contains 15 tests. It uses a fixture-only MU-plugin to observe real
+save hooks and to inject a deterministic title change immediately before the SQL
+CAS. Another fixture hook changes a title during save; the companion must report
+uncertainty rather than success. No marketplace plugin compatibility is claimed.
+Socket wrappers inject lost/truncated replies after the real server has processed
+the request, including restoration failures. Native WordPress revisions and
+post_updated/save_post/wp_after_insert_post events are checked against the real
+WordPress APIs and SQL database.

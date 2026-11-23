@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from backup import BackupManager
 from wordpress_autofix_engine import AutoFixEngine
-from wordpress_rest_gateway import WordPressRESTGateway, WordPressRESTAuthenticationError
+from wordpress_rest_gateway import WordPressRESTGateway, WordPressRESTAuthenticationError, WordPressRESTError
 from wordpress_revision_guard import RevisionMismatchError
 
 
@@ -51,6 +51,7 @@ class RealWordPress:
         self.php_args = [self.php]
         if os.environ.get('FG_WP_PHP_INI'):
             self.php_args += ['-c', os.environ['FG_WP_PHP_INI']]
+        self.php_args += ['-d', 'opcache.enable_cli=0']
         self.cli = os.environ['FG_WP_CLI']
         self.wp = self.root / 'wordpress'
         shutil.copytree(os.environ['FG_WP_SOURCE'], self.wp)
@@ -70,6 +71,9 @@ class RealWordPress:
         plugin.mkdir()
         shutil.copyfile(ROOT / 'wordpress_companion/filip-guard-companion.php', plugin / 'filip-guard-companion.php')
         self.wpcli('plugin', 'activate', 'filip-guard-companion')
+        observer = self.wp / 'wp-content/mu-plugins'
+        observer.mkdir(exist_ok=True)
+        (observer / 'fg-fixture-observer.php').write_text((ROOT / 'tests/real_wordpress/observer.php').read_text())
         self.editor_id = int(self.wpcli('user', 'create', 'fg-editor', 'editor@example.invalid',
                                       '--role=editor', '--user_pass=' + secrets.token_urlsafe(24), '--porcelain'))
         self.subscriber_id = int(self.wpcli('user', 'create', 'fg-subscriber', 'subscriber@example.invalid',
@@ -77,7 +81,8 @@ class RealWordPress:
         self.editor_password = self.wpcli('user', 'application-password', 'create', 'fg-editor', 'FG integration', '--porcelain')
         self.subscriber_password = self.wpcli('user', 'application-password', 'create', 'fg-subscriber', 'FG integration', '--porcelain')
         self.start_servers()
-        self.inject_fault = None
+        self.inject_fault = []
+        self.write_seen = False
         self.request_count = 0
 
     def command(self, args, *, input=None):
@@ -212,7 +217,44 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
     def connector(self, hostname, timeout=15):
         if hostname != 'fgwp.test': raise ValueError('Unexpected local fixture hostname')
         raw=socket.create_connection(('127.0.0.1',self.tls_port),timeout=timeout)
-        return self.client_context.wrap_socket(raw,server_hostname=hostname)
+        connection = self.client_context.wrap_socket(raw,server_hostname=hostname)
+        fixture = self
+        class FaultSocket:
+            buffered = None
+            fault = None
+            def settimeout(self, timeout): connection.settimeout(timeout)
+            def close(self): connection.close()
+            def sendall(self, wire):
+                header, _, body = wire.partition(b'\r\n\r\n')
+                method, path, _ = header.split(b'\r\n', 1)[0].decode().split(' ')
+                if fixture.inject_fault:
+                    candidate = fixture.inject_fault[0]
+                    resource = path.startswith('/wp-json/filip-guard/v1/resources/')
+                    matches = ((candidate in ('write_drop', 'write_truncate') and method == 'POST')
+                        or (candidate == 'verification_drop' and method == 'GET' and resource and fixture.write_seen)
+                        or (candidate == 'rollback_drop' and method == 'POST' and b':rollback' in body))
+                    if matches:
+                        self.fault = fixture.inject_fault.pop(0)
+                if method == 'POST' and path.startswith('/wp-json/filip-guard/'):
+                    fixture.write_seen = True
+                connection.sendall(wire)
+            def recv(self, size):
+                if self.fault:
+                    pieces = []
+                    while True:
+                        piece = connection.recv(65536)
+                        if not piece: break
+                        pieces.append(piece)
+                    data = b''.join(pieces)
+                    fault, self.fault = self.fault, None
+                    if fault != 'write_truncate':
+                        raise TimeoutError('Simulated connection loss after real WordPress response')
+                    self.buffered = data[:-8]
+                if self.buffered is not None:
+                    data, self.buffered = self.buffered[:size], self.buffered[size:]
+                    return data
+                return connection.recv(size)
+        return FaultSocket()
 
     def gateway(self, subscriber=False, wrong=False):
         if subscriber: provider=lambda:('fg-subscriber',self.subscriber_password)
@@ -236,6 +278,7 @@ class RealWordPressTests(unittest.TestCase):
         cls.network.start();cls.addClassCleanup(cls.network.stop)
 
     def setUp(self):
+        self.fixture.inject_fault=[]; self.fixture.write_seen=False
         self.post_id=self.fixture.post()
         self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
         self.gateway=self.fixture.gateway()
@@ -263,6 +306,129 @@ class RealWordPressTests(unittest.TestCase):
         self.assertEqual(self.snapshot().content,'<p>Updated</p>')
         self.assertEqual(self.engine.backups.get_backup(result['backup_id'])['content'],'<p>Original</p>')
         self.assertEqual(self.engine.apply(plan,token,**self.session),result)
+
+    def test_real_revisions_and_core_save_hooks(self):
+        before = int(self.fixture.wpcli('eval', f'echo count(wp_get_post_revisions({self.post_id}));'))
+        self.fixture.wpcli('option', 'delete', 'fg_fixture_events')
+        plan, token = self.approved()
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'applied')
+        after = int(self.fixture.wpcli('eval', f'echo count(wp_get_post_revisions({self.post_id}));'))
+        self.assertGreater(after, before, 'AutoFix must create a native WordPress content revision')
+        events = json.loads(self.fixture.wpcli('option', 'get', 'fg_fixture_events', '--format=json'))
+        for name in ('post_updated', 'save_post', 'wp_after_insert_post'):
+            self.assertIn(name, [event['hook'] for event in events if event['id'] == self.post_id])
+
+    def test_real_plugin_side_effect_is_not_reported_as_verified(self):
+        plan, token = self.approved()
+        self.fixture.wpcli('option', 'update', 'fg_fixture_mutate_post', str(self.post_id))
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'outcome_unknown')
+        title = self.fixture.wpcli('post', 'get', str(self.post_id), '--field=post_title')
+        self.assertEqual(title, 'Fixture plugin changed title')
+
+    def test_real_race_at_the_sql_condition(self):
+        plan, token = self.approved()
+        self.fixture.wpcli('option', 'update', 'fg_fixture_sql_race', str(self.post_id))
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'conflict')
+        self.assertEqual(self.snapshot().content, '<p>Original</p>')
+        self.assertEqual(self.fixture.wpcli('post', 'get', str(self.post_id), '--field=post_title'), 'Concurrent at SQL')
+
+    def test_real_write_lost_or_incomplete_response_never_replays(self):
+        for fault in ('write_drop', 'write_truncate'):
+            with self.subTest(fault=fault):
+                self.post_id = self.fixture.post()
+                plan, token = self.approved()
+                self.fixture.inject_fault = [fault]
+                result = self.engine.apply(plan, token, **self.session)
+                self.assertEqual(result['status'], 'outcome_unknown')
+                self.assertIsNone(result['changes_applied'])
+                self.assertEqual(self.snapshot().content, '<p>Updated</p>')
+                count = self.fixture.request_count
+                self.assertEqual(self.engine.apply(plan, token, **self.session), result)
+                self.assertEqual(self.fixture.request_count, count)
+
+    def test_real_verification_disconnect_triggers_verified_rollback(self):
+        plan, token = self.approved()
+        self.fixture.inject_fault = ['verification_drop']
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'rolled_back')
+        self.assertEqual(self.snapshot().content, '<p>Original</p>')
+
+    def test_real_restore_lost_reply_is_explicitly_unverified(self):
+        plan, token = self.approved()
+        self.fixture.inject_fault = ['verification_drop', 'rollback_drop']
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'rollback_unverified')
+        self.assertTrue(result['requires_intervention'])
+        # A separate read can recover evidence, but the lost receipt was not success.
+        self.assertEqual(self.snapshot().content, '<p>Original</p>')
+
+    def test_real_rollback_does_not_overwrite_later_wordpress_edit(self):
+        plan, token = self.approved()
+        self.fixture.inject_fault = ['verification_drop']
+        compare = self.gateway.compare_and_swap
+        def late_edit(*args, **kwargs):
+            if kwargs['operation_id'].endswith(':rollback'):
+                self.fixture.wpcli('post', 'update', str(self.post_id), '--post_content=<p>Later native edit</p>')
+            return compare(*args, **kwargs)
+        with patch.object(self.gateway, 'compare_and_swap', side_effect=late_edit):
+            result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'rollback_conflict')
+        self.assertEqual(self.snapshot().content, '<p>Later native edit</p>')
+
+    def test_real_permission_revocation_before_application(self):
+        plan, token = self.approved()
+        self.fixture.wpcli('user', 'set-role', str(self.fixture.editor_id), 'subscriber')
+        try:
+            with self.assertRaises(PermissionError):
+                self.engine.apply(plan, token, **self.session)
+        finally:
+            self.fixture.wpcli('user', 'set-role', str(self.fixture.editor_id), 'editor')
+        self.assertEqual(self.snapshot().content, '<p>Original</p>')
+
+    def test_real_draft_page_and_wrong_resource_type(self):
+        page_id = int(self.fixture.wpcli('post', 'create', '--post_type=page', '--post_status=draft',
+            '--post_title=Fixture page', '--post_author=' + str(self.fixture.editor_id),
+            '--post_content=<p>Original page</p>', '--porcelain'))
+        with self.assertRaises(WordPressRESTError):
+            self.gateway.read_authorized('https://fgwp.test', 'post', page_id, self.fixture.editor_id)
+        plan = self.engine.propose(site_url='https://fgwp.test', resource_type='page', resource_id=page_id,
+            proposed_content='<p>Updated page</p>', **self.session)['plan_id']
+        token = self.engine.approve(plan, confirmed=True, **self.session)
+        result = self.engine.apply(plan, token, **self.session)
+        self.assertEqual(result['status'], 'applied')
+        self.assertEqual(self.gateway.read_authorized('https://fgwp.test', 'page', page_id,
+            self.fixture.editor_id).content, '<p>Updated page</p>')
+
+    def test_real_disabled_and_production_gates(self):
+        config = self.fixture.wp / 'wp-config.php'
+        original = config.read_text()
+        for text in (original.replace("define('FILIP_GUARD_TEST_REPAIRS',true)",
+                                      "define('FILIP_GUARD_TEST_REPAIRS',false)"),
+                     original.replace("'staging'", "'production'")):
+            config.write_text(text)
+            try:
+                with self.assertRaises(PermissionError):
+                    self.snapshot()
+            finally:
+                config.write_text(original)
+        self.assertEqual(self.snapshot().content, '<p>Original</p>')
+
+    def test_real_untrusted_tls_certificate_rejected_before_http_credentials(self):
+        count = self.fixture.request_count
+        def untrusted(hostname, timeout=15):
+            raw = socket.create_connection(('127.0.0.1', self.fixture.tls_port), timeout=timeout)
+            try:
+                return ssl.create_default_context().wrap_socket(raw, server_hostname=hostname)
+            except BaseException:
+                raw.close()
+                raise
+        with patch('wordpress_secure_https.create_verified_connection', side_effect=untrusted):
+            with self.assertRaises(WordPressRESTError):
+                self.snapshot()
+        self.assertEqual(self.fixture.request_count, count)
 
     def test_real_conditional_restore_and_idempotency(self):
         original=self.snapshot()
