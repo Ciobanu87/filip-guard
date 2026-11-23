@@ -204,6 +204,13 @@ class TestHTTPResponseValidation(unittest.TestCase):
         self.assertEqual(response.body, b"Hello")
         self.assertIn(("content-length", "5"), response.headers)
 
+    def test_partial_content_response_is_rejected(self):
+        raw = (b"HTTP/1.1 206 Partial Content\r\n"
+               b"Content-Range: bytes 0-2/10\r\n"
+               b"Content-Length: 3\r\n\r\nabc")
+        with self.assertRaisesRegex(InvalidHTTPResponse, "Partial"):
+            parse_http_response(raw)
+
     def test_connection_close_framing_and_error_status(self):
         for version in (b"HTTP/1.0", b"HTTP/1.1"):
             with self.subTest(version=version):
