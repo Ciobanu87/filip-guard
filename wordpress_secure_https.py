@@ -213,8 +213,10 @@ def _https_get_exchange(hostname, path, timeout, *, headers=(), authorization=No
 
 
 def _https_request_exchange(hostname, path, timeout, *, headers=(), authorization=None,
-                            method='GET', body=b''):
+                            method='GET', body=b'', accept='application/json'):
     """Bounded internal JSON GET/POST exchange; no redirect, retry or downgrade."""
+    if accept not in ('application/json', 'text/html,application/xhtml+xml'):
+        raise ValueError('Unsupported HTTPS Accept type')
     if method not in ('GET', 'POST') or type(body) is not bytes:
         raise ValueError('Unsupported HTTPS request')
     if (method == 'GET' and body) or len(body) > 1_100_000:
@@ -239,7 +241,7 @@ def _https_request_exchange(hostname, path, timeout, *, headers=(), authorizatio
         request = (
             f"{method} {path} HTTP/1.1\r\n"
             f"Host: {host_header}\r\n"
-            "Accept: application/json\r\n"
+            f"Accept: {accept}\r\n"
             "Accept-Encoding: identity\r\n"
             "Connection: close\r\n"
             + (f"Authorization: {authorization}\r\n" if authorization is not None else "")
