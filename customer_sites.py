@@ -166,3 +166,21 @@ class CustomerSites:
     def get_backup(self,session,site_id,backup_id,*,now=None):
         engine,_,_=self._context(session,site_id,now=now,require_external=True)
         return engine.backups.get_backup(backup_id)
+
+    def resources(self,session,site_id,*,now=None):
+        _,row=self._owned(session,site_id,now=now)
+        if self.gateway_factory is None:raise LiveAutoFixDisabled('Customer site connections are disabled')
+        gateway=self.gateway_factory(row['origin'],lambda:self._credentials(session,site_id,now=now))
+        return gateway.list_repair_resources(row['wordpress_user_id'])
+
+    def read_resource(self,session,site_id,kind,resource_id,*,now=None):
+        engine,identity,row=self._context(session,site_id,now=now)
+        return engine.gateway.read_authorized(row['origin'],kind,resource_id,identity['user_id'])
+
+    def repair_record(self,session,site_id,plan_id,*,now=None):
+        # Authenticated owner history survives login/session expiry; it cannot approve/apply.
+        engine,_,_=self._context(session,site_id,now=now)
+        with engine._db() as db:
+            row=db.execute('SELECT payload,state,result FROM repair_plans WHERE plan_id=?',(plan_id,)).fetchone()
+        if row is None:raise PermissionError('Repair history unavailable for this site')
+        return dict(plan_id=plan_id,payload=json.loads(row[0]),state=row[1],result=json.loads(row[2]) if row[2] else None)

@@ -148,11 +148,13 @@ class AutoFixEngine:
                 raise PermissionError('Proposal already approved')
         return token
 
-    def _finish(self, plan_id, status, backup_id, *, changes_applied, detail=''):
+    def _finish(self, plan_id, status, backup_id, *, changes_applied, detail='', verified_snapshot=None):
         result = dict(plan_id=plan_id, status=status, backup_id=backup_id,
                       changes_applied=changes_applied, detail=detail,
                       backup_scope='resource_content_only',
                       requires_intervention=status not in ('applied', 'rolled_back', 'conflict'))
+        if verified_snapshot is not None:
+            result['verified_snapshot']=asdict(verified_snapshot)
         with self._db() as db:
             db.execute('UPDATE repair_plans SET state=?, result=? WHERE plan_id=?',
                        (status, _json(result), plan_id))
@@ -238,4 +240,4 @@ class AutoFixEngine:
                 return self._finish(plan_id, 'rollback_unverified', backup_id, changes_applied=None,
                                     detail='Restoration could not be verified. Manual recovery required.')
             return self._finish(plan_id, 'rolled_back', backup_id, changes_applied=False)
-        return self._finish(plan_id, 'applied', backup_id, changes_applied=True)
+        return self._finish(plan_id, 'applied', backup_id, changes_applied=True, verified_snapshot=written)

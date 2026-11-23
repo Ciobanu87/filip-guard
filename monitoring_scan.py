@@ -104,11 +104,13 @@ class SecureMonitoringScan:
         if not 1<=max_seconds<=60 or not 0<=min_gap<=5:raise ValueError('Invalid monitoring limits')
         self.max_seconds,self.min_gap=max_seconds,min_gap
 
-    def __call__(self,origin,*,page_limit=5,max_requests=20,before_request=lambda:None,checkpoint=lambda:None):
+    def __call__(self,origin,*,page_limit=5,max_requests=20,before_request=lambda:None,checkpoint=lambda:None,start_url=None):
         if type(page_limit) is not int or not 1<=page_limit<=30 or type(max_requests) is not int or not page_limit<=max_requests<=60:
             raise ValueError('Invalid monitoring scan bounds')
         hostname,_,_=target_url(origin)
         if 'https://'+hostname!=origin:raise ValueError('Canonical authorized site origin required')
+        start=start_url or origin
+        target_url(start,hostname)
         began=time.monotonic();last=None;count=0;cache={};links=set();limited=False;discovered={}
         def fetch(url,host,method='GET'):
             nonlocal count,last,limited
@@ -147,7 +149,7 @@ class SecureMonitoringScan:
             result=cache[canonical]
             if method=='HEAD':links.add(url)
             return result[0],result[1],'' if method=='HEAD' else result[2]
-        rows,broken,_,_=scan(origin,page_limit,fetcher=fetch,initial_validator=lambda url:target_url(url),
+        rows,broken,_,_=scan(start,page_limit,fetcher=fetch,initial_validator=lambda url:target_url(url),
                             max_links=min(10,max_requests-page_limit),max_discovered=200,link_observer=lambda link,source:discovered.setdefault(link,set()).add(source))
         checkpoint()
         return make_report(rows,broken,links,count,not limited,discovered)

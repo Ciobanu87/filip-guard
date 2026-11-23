@@ -50,7 +50,7 @@ class WordPressRESTGateway:
         self._credentials = credential_provider
         self.timeout = timeout
 
-    def _request(self, path, *, method='GET', data=None):
+    def _request(self, path, *, method='GET', data=None, allow_list=False):
         authorization = credentials = username = password = None
         try:
             credentials = self._credentials()
@@ -88,7 +88,7 @@ class WordPressRESTGateway:
             raise WordPressRESTError('Invalid WordPress REST JSON response') from None
         if response.status == 409 and type(data) is dict and data.get('code') == 'fg_conflict':
             raise RevisionMismatchError('WordPress resource version changed')
-        if response.status != 200 or type(data) is not dict:
+        if response.status != 200 or (type(data) is not list if allow_list else type(data) is not dict):
             raise WordPressRESTError('WordPress companion request failed or outcome is uncertain')
         return response, data
 
@@ -133,6 +133,30 @@ class WordPressRESTGateway:
                 or proof.get('can_manage_site') is not True):
             raise PermissionError('Verified site-administration capability required')
         return identity.user_id
+
+    def list_repair_resources(self, user_id):
+        """Bounded published permalink inventory; never grants write permission."""
+        from urllib.parse import urlsplit
+        self._identity(user_id)
+        items=[]
+        for resource in ('posts','pages'):
+            _, data=self._request('/wp-json/wp/v2/'+resource+
+                '?per_page=30&_fields=id,link,slug,title,status,type',allow_list=True)
+            if len(data)>30:raise WordPressRESTError('WordPress inventory exceeds limit')
+            kind='post' if resource=='posts' else 'page'
+            for item in data:
+                if type(item) is not dict:raise WordPressRESTError('Invalid WordPress inventory')
+                identifier,link=item.get('id'),item.get('link')
+                if (type(identifier) is not int or identifier<=0 or type(link) is not str or len(link)>2048
+                        or item.get('type')!=kind or item.get('status')!='publish'):
+                    raise WordPressRESTError('Invalid published WordPress resource')
+                p=urlsplit(link)
+                if ('https://'+_origin('https://'+p.netloc)!=self.site_url or p.scheme!='https' or p.fragment):
+                    raise WordPressRESTError('WordPress inventory target mismatch')
+                title=item.get('title',{}).get('rendered','') if type(item.get('title')) is dict else ''
+                items.append(dict(resource_id=identifier,resource_type=kind,link=link,
+                    slug=str(item.get('slug',''))[:200],title=str(title)[:300],status='publish'))
+        return items
 
     def read_authorized(self, site, kind, resource_id, user_id):
         path = self._target(site, kind, resource_id, user_id)
