@@ -199,7 +199,20 @@ def secure_https_get(hostname, path="/", timeout=15, *, headers=()):
     The I/O deadline includes connect time but cannot interrupt system DNS.
     Abrupt TLS EOF is rejected, including for connection-close framing.
     """
+    return _https_get_exchange(hostname, path, timeout, headers=headers)
+
+
+def _https_get_exchange(hostname, path, timeout, *, headers=(), authorization=None):
+    """Internal candidate transport; authenticated application entry stays disabled.
+
+    Authorization is built only by the dedicated credential validator. Generic
+    caller-supplied headers continue to forbid credentials and Host overrides.
+    """
     host_header = _validate_request(hostname, path, timeout)
+    if authorization is not None and (
+            not isinstance(authorization, str) or len(authorization) > 2048
+            or not re.fullmatch(r'Basic [A-Za-z0-9+/]+={0,2}', authorization)):
+        raise ValueError('Invalid internal authorization header')
     from wordpress_http_headers import validate_request_headers
     safe_headers = validate_request_headers(headers)
     deadline = time.monotonic() + timeout
@@ -218,6 +231,7 @@ def secure_https_get(hostname, path="/", timeout=15, *, headers=()):
             "Accept: application/json\r\n"
             "Accept-Encoding: identity\r\n"
             "Connection: close\r\n"
+            + (f"Authorization: {authorization}\r\n" if authorization is not None else "")
             + "".join(f"{name}: {value}\r\n" for name, value in safe_headers)
             + "\r\n"
         )
