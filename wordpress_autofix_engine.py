@@ -193,9 +193,10 @@ class AutoFixEngine:
                 or backup.get('content') != original.content
                 or backup.get('content_hash') != sha256(original.content.encode()).hexdigest()):
             raise RuntimeError('Persistent verified content backup required')
+        # External backup readback may outlast the approval; re-check wall time now.
         self.approvals.consume_for_offline_review(approval, site_url=original.site_url,
             resource_id=original.resource_id, user_id=user_id, current_content=original.content,
-            proposed_content=payload['proposed_content'], now=instant, session_id=session_id)
+            proposed_content=payload['proposed_content'], now=_instant(now), session_id=session_id)
         with self._db() as db:
             cursor = db.execute("UPDATE repair_plans SET state='applying', result=? WHERE plan_id=? AND state='approved'",
                                 (_json(dict(status='applying', backup_id=backup_id,

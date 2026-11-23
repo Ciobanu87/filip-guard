@@ -187,7 +187,8 @@ A new login cannot inherit approvals from an earlier session.
 
 `VerifiedExternalBackups` integrates the encrypted archive adapter into the
 existing repair engine. It verifies upload readback and re-downloads/decrypts the
-exact resource archive before approval consumption or a write. Missing storage,
+exact resource archive before approval consumption or a write. Approval expiry
+is checked again after external readback, using the current time. Missing storage,
 lost connections, corrupt archives and unavailable keys block execution. Receipts
 survive Streamlit sessions; recovery works without the original snapshot database.
 Namespaces and keys prevent swapping archives across customers/sites.

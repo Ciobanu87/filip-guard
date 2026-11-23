@@ -75,3 +75,19 @@ class VerifiedExternalBackupTests(unittest.TestCase):
     def test_wrong_site_cannot_create_backup(self):
         with self.assertRaises(PermissionError):self.backups.create_backup('https://other.example',1,'secret')
         self.assertEqual(self.store.objects,{})
+
+    def test_approval_expiring_during_external_backup_blocks_write(self):
+        session={key:value for key,value in self.session.items() if key!='now'}
+        with patch('wordpress_autofix_engine.time.time',return_value=100) as clock:
+            plan=self.engine.propose(site_url='https://example.com',resource_type='post',resource_id=1,
+                proposed_content='new',**session)['plan_id']
+            token=self.engine.approve(plan,confirmed=True,**session)
+            create=self.backups.create_backup
+            def slow_backup(*args):
+                backup_id=create(*args)
+                clock.return_value=401
+                return backup_id
+            with patch.object(self.backups,'create_backup',side_effect=slow_backup):
+                with self.assertRaises(PermissionError):
+                    self.engine.apply(plan,token,**session)
+        self.assertEqual(self.gateway.read_authorized('https://example.com','post',1,7).revision,'1')
