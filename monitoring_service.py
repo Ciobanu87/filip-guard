@@ -57,6 +57,7 @@ class MonitoringService:
                 notification_id TEXT PRIMARY KEY, state TEXT NOT NULL, not_before REAL NOT NULL,
                 lease_token TEXT, lease_until REAL, attempts INTEGER NOT NULL DEFAULT 0,
                 sent_at REAL, error TEXT);
+                CREATE TABLE IF NOT EXISTS monitor_runtime (name TEXT PRIMARY KEY,value REAL NOT NULL);
                 CREATE INDEX IF NOT EXISTS monitor_due ON monitor_schedules(enabled,next_due);
             ''')
 
@@ -295,7 +296,17 @@ class MonitoringService:
                 db.execute("UPDATE monitor_runs SET state='cancelled',finished_at=? WHERE run_id=?",(timestamp,job['run_id']))
                 db.execute('UPDATE monitor_schedules SET enabled=0,lease_token=NULL,lease_until=NULL,run_id=NULL WHERE site_id=?',(job['site_id'],))
 
+    def health(self,*,now=None):
+        with self.db() as db:
+            row=db.execute("SELECT value FROM monitor_runtime WHERE name='heartbeat'").fetchone()
+        timestamp=instant(now)
+        return {'last_worker_seen':row[0] if row else None,
+                'worker_recent':bool(row and 0<=timestamp-row[0]<=600),
+                'repairs_authorized':False}
+
     def run_once(self,*,now=None):
+        with self.db() as db:
+            db.execute("INSERT OR REPLACE INTO monitor_runtime VALUES ('heartbeat',?)",(instant(now),))
         job=self.claim(now=now)
         if job is None:return {'status':'idle','repairs_authorized':False}
         def checkpoint():self.checkpoint(job,now=now)

@@ -205,3 +205,17 @@ are now exercised through customer sessions and ownership verification. The real
 suite proves denied cross-customer access and that a corrupt simulated external
 archive prevents an actual WordPress write. The external storage in that scenario
 is explicitly simulated; WordPress/TLS/SQL are real.
+
+## Periodic monitoring and account notifications
+
+Read-only scheduling, durable leases/recovery, scoped history and grouped in-app
+notifications are implemented in `monitoring_service.py`. The existing scanner
+is shared through `website_scanner.py`; the monitor uses a separate verified
+HTTPS reader and cannot authorize or execute AutoFix. Streamlit exposes per-site
+monitoring controls only to the authenticated owner. The separate worker must
+be explicitly configured and run; no live customer schedule has been activated.
+
+See [MONITORING.md](MONITORING.md) for frequency/request limits, recovery semantics,
+private deployment paths and the prepared opt-in SMTP adapter. Email delivery
+remains unconfigured and disabled. Synthetic SMTP tests do not validate a real
+mail service. The public app/main branch and client AutoFix activation are unchanged.

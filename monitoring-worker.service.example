@@ -1,0 +1,26 @@
+# Template only: review paths/user on an explicitly authorized host before installing.
+[Unit]
+Description=FILIP GUARD read-only website monitoring
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=filipguard
+Group=filipguard
+WorkingDirectory=/opt/filip-guard
+EnvironmentFile=/etc/filip-guard/monitoring-paths.env
+ExecStart=/opt/filip-guard/.venv/bin/python monitoring_worker.py --poll-seconds 30 --max-jobs 5
+Restart=on-failure
+RestartSec=30
+TimeoutStopSec=75
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/filip-guard
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
