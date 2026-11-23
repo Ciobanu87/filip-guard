@@ -1,0 +1,32 @@
+# Isolated real WordPress integration
+
+This runner creates a fresh WordPress installation and its own randomly named
+SQL database. It generates test users, Application Passwords, TLS certificate
+and keys, installs only the candidate companion, and binds both web servers to
+loopback. Credentials are temporary and not printed. Cleanup drops its database,
+stops child processes and deletes its generated files. Never supply an existing
+WordPress installation as the clean source.
+
+Requirements: Python project dependencies, PHP 8.3+ with mysqli/phar/iconv/ctype,
+WP-CLI, and an isolated disposable MySQL/MariaDB service. CI supplies MySQL 8.0.36.
+
+1. `python tests/real_wordpress/download.py /tmp/fg-wp-fixture`
+2. Set `FG_WP_SOURCE=/tmp/fg-wp-fixture/wordpress`,
+   `FG_WP_CLI=/tmp/fg-wp-fixture/wp-cli.phar`, `FG_WP_DB_USER`,
+   `FG_WP_DB_PASSWORD` and `FG_WP_DB_PORT` for the disposable SQL service.
+3. `python tests/real_wordpress/run.py`
+
+Optional `FG_WP_PHP_BINARY` and `FG_WP_PHP_INI` select a portable PHP runtime.
+Optional `FG_WP_DB_SERVER`, `FG_WP_DB_BASEDIR`, `FG_WP_DB_DATADIR` start a locally
+installed MariaDB server with no Unix socket and TCP bound to 127.0.0.1. Initialize
+that isolated data directory beforehand using `mariadb-install-db`. The runner
+selects an available local TCP port. Never select a production data directory.
+
+The fixture connector substitutes only the endpoint-to-loopback mapping inside
+the test process. The application transport still verifies the local TLS
+certificate, hostname, framing, bounds and deadline; production SSRF protections
+are not disabled or configured to permit private addresses.
+
+Tests are separate from ordinary offline unit discovery and are reported
+separately. Passing this suite does not demonstrate compatibility with arbitrary
+WordPress plugins, page builders, multisite or hosting-specific behavior.
