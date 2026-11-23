@@ -12,8 +12,10 @@ def _hostname_from_scan(start_url, rows):
     if not isinstance(start_url, str) or not isinstance(rows, list) or len(rows) > 30:
         raise ValueError("Invalid scan context")
     parsed = urlsplit(start_url if '://' in start_url else 'https://' + start_url)
-    if parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password or parsed.port not in (None, 443):
-        raise ValueError("WordPress public audit requires an HTTPS website")
+    if (parsed.scheme != 'https' or not parsed.hostname or parsed.username
+            or parsed.password or parsed.port not in (None, 443)
+            or parsed.path not in ('', '/') or parsed.query or parsed.fragment):
+        raise ValueError("WordPress public audit requires an HTTPS site origin")
     host = parsed.hostname.lower()
     if not rows:
         raise ValueError("Scan a page before starting the WordPress audit")
