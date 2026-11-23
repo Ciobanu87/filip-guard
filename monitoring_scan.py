@@ -55,13 +55,14 @@ class MonitoringReport:
     scope: tuple
     complete: bool
     requests: int
+    discovered_links: tuple = ()
 
 
 def _text(value,limit=1000):
     return ''.join(c for c in str(value) if ord(c)>=32 and ord(c)!=127)[:limit]
 
 
-def make_report(rows,broken,checked_links,requests_count,complete=True):
+def make_report(rows,broken,checked_links,requests_count,complete=True,link_sources=None):
     safe_rows=[];scope=set()
     for row in rows:
         item={key:_text(value,2048 if key=='page' else 1000) if isinstance(value,str) else value for key,value in row.items()}
@@ -69,7 +70,8 @@ def make_report(rows,broken,checked_links,requests_count,complete=True):
         status=item.get('http_status');page=item.get('page','')
         if type(status) is int:
             scope.add(('http',page))
-            if 200<=status<300 and item.get('issues')!='Non-HTML or empty page':scope.add(('seo',page))
+            if 200<=status<300 and item.get('issues')!='Non-HTML or empty page':
+                scope.add(('seo',page));scope.add(('source',page))
         else:complete=False
     recommendations=analyze_pages(safe_rows);findings=[]
     for recommendation in recommendations:
@@ -91,10 +93,10 @@ def make_report(rows,broken,checked_links,requests_count,complete=True):
         findings.append(dict(key=key,scope_kind='link',scope_key=link,page=link,
             problem='Broken internal link',solution='Review and repair the link after explicit approval.',
             reason='Visitors may be unable to reach this destination.',risk='Review replacement relevance.',
-            priority='High',autofix=False))
+            priority='High',autofix=False,sources=sorted((link_sources or {}).get(link,()))))
     scope.update(('link',url) for url in checked_links)
     return MonitoringReport(tuple(safe_rows),tuple(safe_broken),tuple(recommendations),tuple(findings),
-                            tuple(sorted(scope)),bool(complete),requests_count)
+                            tuple(sorted(scope)),bool(complete),requests_count,tuple(sorted(link_sources or {})))
 
 
 class SecureMonitoringScan:
@@ -107,7 +109,7 @@ class SecureMonitoringScan:
             raise ValueError('Invalid monitoring scan bounds')
         hostname,_,_=target_url(origin)
         if 'https://'+hostname!=origin:raise ValueError('Canonical authorized site origin required')
-        began=time.monotonic();last=None;count=0;cache={};links=set();limited=False
+        began=time.monotonic();last=None;count=0;cache={};links=set();limited=False;discovered={}
         def fetch(url,host,method='GET'):
             nonlocal count,last,limited
             target,path,canonical=target_url(url,hostname)
@@ -146,6 +148,6 @@ class SecureMonitoringScan:
             if method=='HEAD':links.add(url)
             return result[0],result[1],'' if method=='HEAD' else result[2]
         rows,broken,_,_=scan(origin,page_limit,fetcher=fetch,initial_validator=lambda url:target_url(url),
-                            max_links=min(10,max_requests-page_limit),max_discovered=200)
+                            max_links=min(10,max_requests-page_limit),max_discovered=200,link_observer=lambda link,source:discovered.setdefault(link,set()).add(source))
         checkpoint()
-        return make_report(rows,broken,links,count,not limited)
+        return make_report(rows,broken,links,count,not limited,discovered)

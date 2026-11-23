@@ -524,6 +524,31 @@ class RealWordPressTests(unittest.TestCase):
             with self.assertRaises(AuthenticationError):
                 service.apply(alice, site_a, *plans[0])
 
+    def test_real_monitoring_reads_public_html_without_credentials_or_repairs(self):
+        from customer_auth import CustomerAuth
+        from customer_sites import CustomerSites
+        from monitoring_service import MonitoringService
+        root=Path(self.temp.name)
+        auth=CustomerAuth(root/'monitor-accounts.sqlite')
+        auth.register('monitor-customer','Real-monitor-fixture-password')
+        token=auth.login('monitor-customer','Real-monitor-fixture-password')
+        directory=CustomerSites(auth,root/'monitor-sites',lambda _:secrets.token_bytes(32),
+                                gateway_factory=WordPressRESTGateway)
+        site=directory.connect(token,self.fixture.site_url,'fg-admin',self.fixture.admin_password)['site_id']
+        monitor=MonitoringService(directory,root/'monitoring.sqlite')
+        monitor.configure(token,site,enabled=True,interval_seconds=900,page_limit=1,max_requests=1)
+        with patch.object(directory,'_credentials',side_effect=AssertionError('Monitoring cannot read secrets')), \
+             patch.object(directory,'apply',side_effect=AssertionError('Monitoring cannot repair')):
+            result=monitor.run_once()
+        self.assertEqual(result['status'],'complete')
+        self.assertFalse(result['repairs_authorized'])
+        history=monitor.history(token,site)
+        self.assertEqual(history[0]['report']['rows'][0]['http_status'],200)
+        self.assertEqual(history[0]['requests'],1)
+        self.assertEqual(monitor.run_once()['status'],'idle')
+        monitor.configure(token,site,enabled=False)
+        self.assertEqual(monitor.run_once()['status'],'idle')
+
     def test_real_conditional_restore_and_idempotency(self):
         original=self.snapshot()
         updated=self.gateway.compare_and_swap(original,'<p>Updated</p>',self.fixture.editor_id,operation_id=secrets.token_hex(16))

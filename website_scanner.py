@@ -78,7 +78,7 @@ def normalize_link(base, href, host):
     return link
 
 
-def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, max_discovered=None):
+def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, max_discovered=None, link_observer=None):
     if not urlparse(start).scheme:
         start = 'https://' + start
     (initial_validator or validate_url)(start)
@@ -117,6 +117,8 @@ def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, m
                 link = normalize_link(final, a['href'], host)
                 if link and (max_discovered is None or link in link_sources or len(link_sources)<max_discovered):
                     link_sources.setdefault(link, set()).add(url)
+                    if link_observer is not None:
+                        link_observer(link, url)
                     if link not in seen and link not in queue and len(seen) + len(queue) < limit * 4:
                         queue.append(link)
         except (requests.RequestException, ValueError, UnicodeError) as exc:
