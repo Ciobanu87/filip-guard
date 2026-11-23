@@ -100,6 +100,49 @@ Filip_Guard_Companion::routes();
 if ($scenario !== 'cookie') {
     Filip_Guard_Companion::application_authenticated((object) array('ID' => 7), array('password' => 'fictitious-never-retained'));
 }
+// Line-oriented bridge for Python-to-PHP protocol integration. No HTTP server.
+if ($scenario === 'bridge') {
+    $fail_read_after_write = false;
+    while (($line = fgets(STDIN)) !== false) {
+        $command = json_decode($line, true);
+        if (($command['control'] ?? '') === 'quit') { break; }
+        if (isset($command['control'])) {
+            switch ($command['control']) {
+                case 'race': $wpdb->race = true; break;
+                case 'verification_failure': $fail_read_after_write = true; break;
+                case 'forbidden': $GLOBALS['can_edit'] = false; break;
+                case 'stats': break;
+                default: throw new Exception('Invalid bridge control');
+            }
+            echo json_encode(array('queries' => $wpdb->queries, 'content' => $wpdb->row['post_content'])) . "\n";
+            flush();
+            continue;
+        }
+        $path = $command['path'] ?? '';
+        if (($command['authorization'] ?? '') !== 'Basic ' . base64_encode('editor:fakepassword')) {
+            $result = new WP_Error('auth_denied', 'Rejected', array('status' => 401));
+        } elseif ($path === '/wp-json/wp/v2/users/me') {
+            $result = new WP_REST_Response(array('id' => 7, 'slug' => 'editor', 'name' => 'Editor'), 200);
+        } elseif (preg_match('#^/wp-json/filip-guard/v1/resources/(post|page)/([1-9][0-9]{0,9})$#D', $path, $matches)) {
+            $request = new Request($command['body'] ?? null, $matches[1], $matches[2]);
+            if ($command['method'] === 'GET' && $fail_read_after_write && $wpdb->queries > 0) {
+                $fail_read_after_write = false;
+                $result = new WP_Error('verification_unavailable', 'Unavailable', array('status' => 503));
+            } else {
+                $result = $command['method'] === 'GET'
+                    ? Filip_Guard_Companion::read($request) : Filip_Guard_Companion::update($request);
+            }
+        } else {
+            $result = new WP_Error('rest_no_route', 'Missing', array('status' => 404));
+        }
+        $reply = is_wp_error($result)
+            ? array('status' => $result->data['status'], 'body' => array('code' => $result->code))
+            : array('status' => $result->status, 'body' => $result->data);
+        echo json_encode($reply) . "\n";
+        flush();
+    }
+    exit(0);
+}
 $request = new Request();
 $read = Filip_Guard_Companion::read($request);
 $gate_errors = array('disabled' => 'fg_disabled', 'production' => 'fg_disabled',

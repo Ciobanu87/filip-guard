@@ -120,7 +120,11 @@ restored through this endpoint; the engine reports restoration failure explicitl
 Saved content backups are not full-site backups.
 
 Tests cover actual Python HTTP serialization/parsing with synthetic sockets and
-execute the PHP endpoint against controlled WordPress/wpdb API stubs. PHP lint
+execute the PHP endpoint against controlled WordPress/wpdb API stubs. A second
+integration suite sends the Python engine/gateway requests through the actual PHP
+companion handlers over a local subprocess bridge, exercising application,
+concurrent title changes, permission revocation, lost replies and conditional
+rollback. No socket listener or real WordPress database is used. PHP lint
 and these endpoint tests run in GitHub Actions. These are not a real WordPress,
 MySQL/MariaDB, TLS-hosting or third-party-plugin integration test. Separate
 validation on an authorized nonproduction WordPress environment is still required.
