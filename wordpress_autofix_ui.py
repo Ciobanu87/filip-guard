@@ -1,58 +1,28 @@
+"""WordPress AutoFix UI: explicit fail-closed status until secure auth is ready.
 
+Never request application passwords while authenticated transport is disabled.
+The public WordPress audit is available separately and needs no credentials.
+"""
 import streamlit as st
 
-from wordpress_connection import WordPressConnection
+from wordpress_remote_readiness import assess_remote_readiness
 
 
-def render_wordpress_autofix_ui():
-    st.divider()
-    st.subheader("WordPress AutoFix")
-    st.caption(
-        "Beta: verificare conexiune. "
-        "Nu se modifica site-ul."
+def render_wordpress_autofix_ui(st_module=None):
+    ui = st if st_module is None else st_module
+    ui.divider()
+    ui.subheader("WordPress AutoFix")
+    ui.warning(
+        "AutoFix is not available yet. Secure WordPress authentication and "
+        "verified backup, approval, post-change checks and rollback must be "
+        "completed before website changes can be enabled."
     )
-
-    with st.form("wordpress_connection_form"):
-        site_url = st.text_input(
-            "WordPress URL",
-            placeholder="https://example.com",
-        )
-
-        username = st.text_input(
-            "WordPress username"
-        )
-
-        app_password = st.text_input(
-            "Application Password",
-            type="password",
-        )
-
-        submitted = st.form_submit_button(
-            "Verifica conexiunea"
-        )
-
-    if submitted:
-        if not site_url or not username or not app_password:
-            st.warning("Completeaza toate campurile.")
-            return
-
-        try:
-            connection = WordPressConnection()
-            result = connection.verify(
-                site_url, username, app_password
-            )
-
-            if result.get("connected") is True:
-                st.success("Conexiune WordPress reusita!")
-                st.info(
-                    "Modul read-only. "
-                    "Nicio reparatie nu a fost aplicata."
-                )
-            else:
-                st.error("Conexiunea nu a fost confirmata.")
-
-        except Exception:
-            st.error(
-                "Verificarea conexiunii a esuat. "
-                "Controleaza URL-ul si credentialele."
-            )
+    ui.info(
+        "No WordPress username or Application Password is needed now. "
+        "Use the public read-only WordPress audit above to review suggestions. "
+        "No website changes are made."
+    )
+    readiness = assess_remote_readiness()
+    if readiness["remote_write_authorized"] or readiness["changes_applied"]:
+        raise RuntimeError("Unsafe AutoFix readiness state")
+    return readiness
