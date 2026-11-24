@@ -10,7 +10,7 @@ import subprocess
 import sys
 import uuid
 
-REVISION = '8d61bd076b58cd4233931739970f6fa48f8058b1'
+REVISION = 'f03d20ad6c7b9ab9454c82971ac5c8b12d7244fc'
 
 
 def require_completed_quality(advisor):
