@@ -16,6 +16,7 @@ from advisor_context import evidence_bundle,VERSION,clean
 from advisor_provider import OllamaProvider
 from advisor_diagnostics import AdvisorFailure,safe_diagnostic
 import advisor_quota
+from advisor_credentials import is_credential_failure
 
 FOCUS={'Missing SEO title':'discoverability','Missing meta description':'discoverability',
        'H1 structure needs review':'structure','Images missing ALT text':'accessibility',
@@ -137,7 +138,8 @@ class ContextualAdvisor:
                     return render_language({**fallback,'status':'provider-cooldown','cooldown':cooldown,'diagnostic':cooldown['diagnostic'],'cache_origin':'provider-backoff'},language)
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             old_quota=bool(old and old[2] and advisor_quota.is_quota(json.loads(old[2]).get('diagnostic')))
-            if old and old[0]>now and not old_quota and old[1]!='transient':
+            old_key_error=bool(old and old[2] and is_credential_failure(json.loads(old[2]).get('diagnostic')))
+            if old and old[0]>now and not old_quota and not old_key_error and old[1] not in ('transient','readiness-failure'):
                 checkpoint()
                 if old[1]=='complete':cached=json.loads(old[2])
                 else:
@@ -155,6 +157,12 @@ class ContextualAdvisor:
             # Preserve spent reservations on expired identical requests by a separate usage ledger.
             db.execute('CREATE TABLE IF NOT EXISTS advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
             db.execute('INSERT OR IGNORE INTO advisor_budget VALUES (?,0)',(day,))
+            ready=getattr(self.provider,'check_ready',None)
+            if callable(ready):
+                try:ready()
+                except AdvisorFailure as error:
+                    if not is_credential_failure(error.diagnostic):raise
+                    return render_language({**fallback,'status':'credential-unavailable','diagnostic':safe_diagnostic(error),'cache_origin':'credential-readiness'},language)
             if db.execute('UPDATE advisor_budget SET calls=calls+1 WHERE day=? AND calls<?',(day,self.daily_calls)).rowcount!=1:
                 return render_language({**fallback,'status':'daily-limit'},language)
             db.execute('INSERT OR REPLACE INTO advisor_requests VALUES (?,?,?,?,?,?,NULL)',(scope,digest,now,now+30,day,'pending'))
@@ -183,12 +191,14 @@ class ContextualAdvisor:
             if result is not None:
                 with self.db() as db:
                     limited=advisor_quota.is_quota(result.get('diagnostic'))
+                    key_failure=is_credential_failure(result.get('diagnostic'))
+                    if key_failure:result={**result,'status':'credential-unavailable','cache_origin':'credential-readiness'}
                     if limited:
                         advisor_quota.record(db,provider_key,self.clock(),result['diagnostic'])
                         cooldown=advisor_quota.active(db,provider_key,self.clock())
                         result={**result,'status':'provider-cooldown','cooldown':cooldown,'cache_origin':'fresh-provider-limit'}
                     db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',
-                        ('transient' if limited else 'complete' if result['status']=='model-assisted' else 'failed',
+                        ('readiness-failure' if key_failure else 'transient' if limited else 'complete' if result['status']=='model-assisted' else 'failed',
                          now+(3600 if result['status']=='model-assisted' else 600),json.dumps(result),scope,digest,now))
         return render_language(result,language)
 

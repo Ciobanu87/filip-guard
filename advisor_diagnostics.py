@@ -1,7 +1,7 @@
 """Allowlisted diagnostics only: never exceptions, headers, bodies or user text."""
 STAGES={'connect','send','read','http','json','provider','selection','deadline','input','unknown'}
 CODES={'timeout','connection_failed','tls_failed','dns_failed','network_failed','invalid_http','http_error',
-       'invalid_json','response_rejected','key_unavailable','input_bound','schema_shape','finding_count',
+       'invalid_json','response_rejected','key_unavailable','key_access_timeout','key_access_denied','key_not_found','key_invalid','key_closed','input_bound','schema_shape','finding_count',
        'selection_fields','finding_identity','evidence_binding','focus_priority','priority_downgrade',
        'evidence_missing','draft_unsupported','contract_mismatch','model_identity','completion_incomplete','unsafe_message','usage_rejected','context_contradiction','ok','unknown'}
 from advisor_provider import ProviderUnavailable

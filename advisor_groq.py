@@ -11,6 +11,7 @@ import socket
 import ssl
 from advisor_diagnostics import AdvisorFailure
 from advisor_quota import quota_metadata
+from advisor_credentials import credential_failure,valid_groq_key
 from advisor_provider import ProviderUnavailable,strict_json
 from wordpress_secure_https import create_verified_connection,parse_http_response
 
@@ -107,13 +108,17 @@ class GroqFreeProvider:
         if free_plan_confirmed is not True or data_consent is not True:
             raise ValueError('Free organization and sanitized-data transfer must be explicitly confirmed')
         self.model=model;self.keys=key_provider;self.successful_exchanges=0;self.last_usage=None;self.last_diagnostic=None;self.attempted_exchanges=0;self.last_request_metrics=None;self.last_quota=None
+    def check_ready(self):
+        try:valid_groq_key(self.keys())
+        except Exception as error:raise credential_failure(error) from None
+
     def generate(self,messages,schema,*,timeout=15,max_output_tokens=1200):
         if not 1<=timeout<=20 or not 64<=max_output_tokens<=1600:raise ValueError('Bounded inference required')
         body,self.last_request_metrics=build_payload(messages,schema,model=self.model,max_output_tokens=max_output_tokens)
         self.last_diagnostic=None;self.last_usage=None;self.last_quota=None
         try:
-            try:key=self.keys()
-            except Exception:raise AdvisorFailure('key_unavailable','input') from None
+            try:key=valid_groq_key(self.keys())
+            except Exception as error:raise credential_failure(error) from None
             try:
                 self.attempted_exchanges+=1
                 result=cloud_exchange(body,key,timeout)

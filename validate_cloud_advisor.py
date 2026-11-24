@@ -73,7 +73,7 @@ def run_validation(advisor,*,live=False,wait=time.sleep,progress=None,max_cases=
                              'missing_information':item['missing_information'],'cause':item.get('cause'),'impact':item.get('impact')}}
         diagnostic=event['diagnostic'] or {}
         if diagnostic.get('http_status') in (400,401,403,404,422,429) or result['status']=='provider-cooldown':halt=diagnostic
-        if result['status'] in ('daily-limit','rate-limit','busy'):halt={'stage':'input','code':result['status']}
+        if result['status'] in ('daily-limit','rate-limit','busy','credential-unavailable'):halt=diagnostic or {'stage':'input','code':result['status']}
         invalid_results=invalid_results+1 if result['status']=='model-unavailable-or-invalid' else 0
         if max_consecutive_invalid and invalid_results>=max_consecutive_invalid:halt=diagnostic or {'stage':'selection','code':'unknown'}
         if diagnostic.get('stage') in ('connect','send','read'):
