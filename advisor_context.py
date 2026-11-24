@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 VERSION='grounded-advisor-v4'
 INJECTION=re.compile(r'ignore.{0,30}(instructions|rules)|system\s*prompt|developer\s*message|<\|(?:im_start|system)|exfiltrat|(?:api|secret)[ _-]?key|application[ _-]?password|bearer\s+\S+|BEGIN .*PRIVATE KEY',re.I)
-SENSITIVE=re.compile(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:\d[ -]?){9,}\b|\b(?:sk-|ghp_|github_pat_)[A-Za-z0-9_-]+|\b(?:password|token|secret)\s*[:=]\s*\S+',re.I)
+SENSITIVE=re.compile(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:\d[ -]?){9,}\b|\b(?:sk-|gsk_|ghp_|github_pat_)[A-Za-z0-9_-]+|\b(?:password|token|secret)\s*[:=]\s*\S+',re.I)
 
 def clean(value,limit=400):
     if not isinstance(value,str):return ''

@@ -167,3 +167,15 @@ custody, persistent UI/worker restart validation, verified provider email delive
 and integrated deployment configuration. Their prepared adapters and safety gates
 remain in place; no paid account, production secret, customer site or `main`
 was changed. The existing live AI cases need no owner intervention or repetition.
+
+### Follow-on security regression: bare Groq key redaction
+
+A synthetic `gsk_`-prefixed token with no `secret=` label was not recognized by
+the existing page-text redaction regex. This is a demonstrated filter omission,
+not evidence that the owner's key was ever in a scanned page or sent to a model.
+The known-prefix redactor now covers bare Groq keys in titles, metadata and body
+context. Regression tests verify the token is absent from the complete provider
+bundle while ordinary public text remains available. No actual key is read or
+used by these tests. No provider call, permission, quota or repair gate changes.
+The input fingerprint naturally changes for affected text; no global version/cache
+reset is performed, so the nine clean accepted fixtures remain reusable.
