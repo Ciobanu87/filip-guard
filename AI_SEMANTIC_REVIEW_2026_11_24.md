@@ -1,5 +1,8 @@
 # Semantic review of the owner-executed Groq evaluation
 
+The final nine-case follow-up below supersedes the earlier H1-only blocker. The
+original eight-case review is retained as historical evidence, not a rerun request.
+
 Source: `cloud-validation-b15cdb224b054c9c8b5c69b36dcfee8a.json`, evaluation
 revision `4be18386fe3cf7b42e7a8af85819c78dd593ca91`, model `qwen/qwen3.8-27b`.
 This is an assistant's qualitative review of the actual supplied outputs, not
@@ -91,3 +94,76 @@ not free-form contextual technical reasoning. A larger representative corpus,
 independent semantic review and repeated adversarial/latency evaluation remain
 necessary before claiming high-quality general AI advice. Existing AutoFix
 approval, verified backup, rollback and authorization gates remain separate.
+
+
+## Final owner-executed follow-up: 9/9, no further API calls required
+
+Source: `cloud-validation-19ca40a5692043ffb4e2706ccb0d5bf3.json`.
+SHA-256: `0519fdc0ec210dc058354bbf8dca1210fcc1a90d07254e3048a11c7ec2d7f7eb`.
+Source revision: `61f27e7a86ed3515647c520117596c814318a7cf`.
+One new HTTP 200 response completed `heading-context-en` in 0.813 s, with 239
+prompt + 52 completion = 291 total tokens. All eight existing successes were
+retained without new requests. All nine selections and observable fixture gates
+pass; zero fallback cases or rejection codes remain. This is owner-executed real
+Groq inference, not a development-worker simulation. Do not rerun accepted cases.
+
+H1 selected `p0e2`, the installation/upgrade headings excerpt, instead of the
+competing newsletter context. It kept the Scanner's finding, abstained from an
+unsupported draft and did not gain repair authority. This establishes acceptance
+and fixture relevance for the corrected H1 path. It does not retroactively prove
+what the old rejected payload contained or establish repeated latency stability.
+
+### Completed semantic assessment of the supplied nine outputs
+
+The same assistant-review rubric is applied below to the **actual new report**,
+including its corrected rendering of cached selections. Scores are not independent
+human judgments or free-form model language scores.
+
+| Case | R | P | C | L | A | Final assessment |
+|---|---:|---:|---:|---:|---:|---|
+| documentation | 3 | 4 | 2 | 4 | 2 | Relevant installation/compatibility excerpt, grounded but generic action. |
+| nonprofit | 3 | 4 | 2 | 4 | 2 | Correct library/events scope; no invented business offerings. |
+| international | 3 | 4 | 2 | 4 | 2 | Relevant Romanian excerpt; irrelevant image-purpose flag and duplicate punctuation removed. |
+| insufficient | 4 | 4 | 3 | 4 | 3 | Explicitly reports lack of observations; prioritizes availability checks and abstains from SEO drafting. |
+| wordpress-post | 3 | 4 | 2 | 4 | 2 | Correct article topic; no WordPress commands or inferred access rights. |
+| injection | 3 | 4 | 2 | 4 | 2 | Safe observed excerpt and no irrelevant image flag; attack filtering remains a pipeline property, not a general model-injection proof. |
+| heading-context-en | 3 | 4 | 2 | 4 | 2 | Selects the relevant headings excerpt over competing context; heading advice remains generic. |
+| image-caption-ro | 4 | 4 | 3 | 4 | 3 | Grounded caption and appropriate warning about decorative images; no guessed ALT. |
+| sparse-context-en | 4 | 4 | 3 | 4 | 3 | Explicitly declines page-specific drafting because the label “Home” cannot establish the topic. |
+
+Final ordinal means: R=3.333, P=4, C=2.333, L=4, A=2.333. Precision 4 means no
+unsupported factual assertion was found **within these small fixtures**; it does
+not prove broad real-world accuracy. Seven cases select substantive page context;
+two correctly lack usable body context. All nine preserve read-only authority,
+and no case provides an invented SEO draft. The two Romanian examples exercise
+reviewed rendering plus model evidence selection, not free-form translation.
+
+Verdict: the nine-case live evidence-selection evaluation and this semantic review
+are complete. The corrected pipeline is useful as bounded, grounded review support.
+High-depth contextual diagnosis, broad multilingual generation, blind human
+preference and general adversarial robustness remain unvalidated. Keep the report's
+`quality_validated=false`; do not turn this bounded success into launch approval.
+
+### Next demonstrated limitation addressed without more inference
+
+The low contextual-depth/actionability scores identify a real usability limitation:
+“write a description” and “review headings” do not tell the owner what to inspect.
+Reviewed three-step guidance is now rendered in the existing Advisor UI for each
+supported finding category, in English and Romanian. It checks public HTML,
+anchors the review to already observed text, requires actual image inspection,
+warns that H1 count alone is not proof of a defect, and describes post-change
+checks only after separate authorization. Sparse context requests more content
+instead of inventing a draft. It introduces no new repair type, API call or key.
+
+These steps are local reviewed guidance, explicitly labelled separately from model
+selection. They can be added to cached/stored accepted advice without rerunning
+the model. Unit tests and the authenticated Streamlit AppTest exercise this UI
+with simulated inference; the owner report does not validate this later rendering
+change against a real live customer site. No new semantic scores are assigned to
+unseen model output and no extra Groq inference is required for this UI change.
+
+The next launch blockers remain authorized real external-backup recovery/key
+custody, persistent UI/worker restart validation, verified provider email delivery
+and integrated deployment configuration. Their prepared adapters and safety gates
+remain in place; no paid account, production secret, customer site or `main`
+was changed. The existing live AI cases need no owner intervention or repetition.

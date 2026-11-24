@@ -137,12 +137,16 @@ The Romanian case evaluates evidence/draft selection, **not fluent Romanian
 model-generated explanations**. Filtering an injection is pipeline defense, not
 proof of universal model injection resistance.
 
-Current tests use mocked API responses/sockets. No real Groq inference, external
-latency, stability or quality improvement is claimed. After owner authentication:
-run the notebook, review all seven results, repeat on held-out English/Romanian
-pages with human relevance judgments, and compare blind against the deterministic
-baseline. Check acceptance/fallback rates and token/latency stability. Do not
-infer reasoning quality from JSON-schema compliance or a page quote alone.
+Development contract tests use mocked API responses/sockets. The owner has now
+completed the distinct nine-case live Groq quality continuation: 9/9 accepted,
+with only the unfinished H1 case called on the final run (HTTP 200, 0.813 s,
+291 tokens). Eight prior accepted cases were preserved. Do not repeat those
+validated calls. See `AI_SEMANTIC_REVIEW_2026_11_24.md` for the completed output
+review, report provenance and remaining limitations. This does not establish
+repeated latency stability, unrestricted model-generated Romanian explanations,
+blind preference over rules, or production readiness. A broader held-out corpus
+and independent review remain future quality gates, not a request to rerun the
+existing accepted cases. Existing quota/cooldown ledgers must not be reset.
 
 Official references:
 - https://console.groq.com/docs/rate-limits

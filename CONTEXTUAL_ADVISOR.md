@@ -152,6 +152,16 @@ Official API/model references checked 2026-11-24:
 - https://docs.ollama.com/capabilities/structured-outputs
 - https://ollama.com/library/qwen3:8b
 
-Outstanding: authorized model runtime, real inference, calibrated quality/latency,
-independent adversarial review and human approval of SEO wording. This engine is
-not declared final or ready for launch.
+Owner-executed Groq Free inference is now verified on nine synthetic quality
+cases (9/9 accepted, including the repaired H1 case), with all accepted results
+preserved between runs. See `AI_SEMANTIC_REVIEW_2026_11_24.md`; those cases need
+no repeated API calls. The model selects observed evidence; explanations and the
+new English/Romanian three-step review guidance are reviewed templates. Existing
+stored advice receives UI guidance without another inference. No review step
+executes a repair, supplies an approval or changes the AutoFix gate.
+
+Outstanding: broader calibrated quality/latency, independent adversarial review,
+human approval of SEO wording and authorized integrated hosting/provider setup.
+The real WordPress UI job still uses simulated AI responses; real Groq evidence
+selection was tested separately in Colab. This engine is not declared final or
+ready for launch.

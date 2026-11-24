@@ -44,6 +44,8 @@ class AuthenticatedAdvisorIntegrationTests(unittest.TestCase):
             self.assertEqual(list(at.exception),[])
             self.assertTrue(any('model-assisted' in x.value for x in at.caption))
             self.assertTrue(any('Handmade oak' in x.value for x in at.text))
+            self.assertTrue(any('reviewed templates' in x.value for x in at.caption))
+            self.assertTrue(any('Verify the missing' in x.value for x in at.text))
             self.assertFalse(any(x.label=='Approve and apply test change' for x in at.button))
             next(x for x in at.button if x.label=='Prepare exact repair proposal').click();at.run()
             self.assertTrue(next(x for x in at.button if x.label=='Approve and apply test change').disabled)
