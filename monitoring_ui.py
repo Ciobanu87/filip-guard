@@ -68,6 +68,6 @@ def render_monitoring(st_module=None,*,service=None):
                     else:ui.caption(event.get('message','Monitoring update'))
                 if notice['read_at'] is None and ui.button('Mark as read',key='fg_customer_notice_'+notice['notification_id']):
                     service.mark_read(session,notice['notification_id']);ui.rerun()
-            ui.caption('Monitoring is read-only. Email delivery is not enabled in this deployment.')
+            ui.caption('Monitoring is read-only. Email requires a separately authorized sender and verified recipient; SMTP acceptance does not prove inbox delivery.')
         except PermissionError:
             ui.warning('Monitoring access is unavailable. Sign in again.')

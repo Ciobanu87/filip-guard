@@ -1,0 +1,28 @@
+# Template only. Requires an authorized Linux host with persistent private volume.
+[Unit]
+Description=FILIP GUARD isolated integrated test UI
+After=network-online.target
+Wants=network-online.target
+[Service]
+Type=simple
+User=filipguard
+Group=filipguard
+WorkingDirectory=/opt/filip-guard
+EnvironmentFile=/etc/filip-guard/test-workspace.env
+# Credentials are delivered as private read-only files, never argv or GitHub secrets.
+LoadCredential=v1.key:/etc/filip-guard/custody/v1.key
+LoadCredential=s3.json:/etc/filip-guard/custody/s3.json
+Environment=FG_GUARD_KEY_DIRECTORY=%d
+Environment=FG_GUARD_S3_CREDENTIALS_FILE=%d/s3.json
+ExecStart=/opt/filip-guard/.venv/bin/python -m streamlit run app.py --server.address=127.0.0.1 --server.port=8501 --server.headless=true --browser.gatherUsageStats=false
+Restart=on-failure
+RestartSec=30
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/filip-guard
+MemoryMax=768M
+[Install]
+WantedBy=multi-user.target

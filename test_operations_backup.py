@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import test_guard_application as fixture
-from operations_backup import probe_external_backup,recover_customer_archive,main
+from operations_backup import probe_external_backup,recover_customer_archive,export_recovery_manifest,main
 from test_verified_external_backups import MemoryStore
 from wordpress_encrypted_backup import EncryptedBackupError
 
@@ -26,6 +26,11 @@ class OperationsRecoveryTests(unittest.TestCase):
         engine,_,_=f.sites._context(f.a,f.site_a)
         with engine.backups.db() as db:receipt=dict(db.execute('SELECT * FROM external_backups WHERE backup_id=?',(result['backup_id'],)).fetchone())
         manifest={**receipt,'customer_id':principal.customer_id,'site_id':f.site_a,'scope':'resource_content_only'}
+        copied=f.root/'receipt-copy.json'
+        export_recovery_manifest(f.sites.root,principal.customer_id,f.site_a,result['backup_id'],copied)
+        self.assertEqual(json.loads(copied.read_text())['object_id'],manifest['object_id'])
+        with self.assertRaises(FileExistsError):export_recovery_manifest(f.sites.root,principal.customer_id,f.site_a,result['backup_id'],copied)
+        with self.assertRaises(PermissionError):export_recovery_manifest(f.sites.root,'b'*32,f.site_a,result['backup_id'],f.root/'invalid.json')
         f.auth.logout(f.a)
         destination=f.root/'independent-recovered.sqlite'
         answer=recover_customer_archive(f.store,lambda _:f.master,manifest,destination)

@@ -1,0 +1,7 @@
+# Optional systemd drop-in for the existing monitoring-worker.service template.
+# Do not install before the provider/sender/recipient verification and authorization.
+[Service]
+LoadCredential=smtp.json:/etc/filip-guard/custody/smtp.json
+LoadCredential=verified-recipients.json:/etc/filip-guard/custody/verified-recipients.json
+Environment=FG_SMTP_CREDENTIALS_FILE=%d/smtp.json
+Environment=FG_EMAIL_BINDINGS_FILE=%d/verified-recipients.json

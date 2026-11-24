@@ -24,9 +24,10 @@ def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
         print(json.dumps({'status':'configuration_unavailable'}));return 2
     if service is None:
         print(json.dumps({'status':'not_configured'}));return 2
+    email_config_failed=False
     try:email_dispatcher=email_dispatcher if email_dispatcher is not None else configured_email_dispatcher(service)
     except Exception:
-        print(json.dumps({'status':'email_configuration_unavailable'}));return 2
+        email_dispatcher=None;email_config_failed=True
     stop=stop_event if stop_event is not None else threading.Event()
     previous={}
     if threading.current_thread() is threading.main_thread():
@@ -42,7 +43,7 @@ def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
                     if status=='idle':break
                     summary['processed']+=1
                     if status in ('complete','partial','error'):summary[status]+=1
-                summary['email']=email_dispatcher.dispatch_once() if email_dispatcher is not None else {'status':'disabled','sent':0}
+                summary['email']=email_dispatcher.dispatch_once() if email_dispatcher is not None else {'status':'configuration_unavailable' if email_config_failed else 'disabled','sent':0}
             except Exception:
                 summary['error']+=1
                 print(json.dumps(summary))

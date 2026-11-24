@@ -66,3 +66,11 @@ class EmailOperationsTests(unittest.TestCase):
         with redirect_stdout(StringIO()):
             self.assertEqual(main(['--once'],service=self.f.monitor,email_dispatcher=dispatcher),0)
         dispatcher.dispatch_once.assert_called_once()
+
+    def test_invalid_email_configuration_does_not_stop_read_only_monitoring(self):
+        output=StringIO()
+        with patch('monitoring_worker.configured_email_dispatcher',side_effect=ValueError('synthetic-secret')),redirect_stdout(output):
+            self.assertEqual(main(['--once'],service=self.f.monitor),0)
+        result=json.loads(output.getvalue())
+        self.assertEqual(result['email']['status'],'configuration_unavailable')
+        self.assertNotIn('synthetic-secret',output.getvalue())

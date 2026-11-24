@@ -44,3 +44,19 @@ class KeyCustodyTests(unittest.TestCase):
         provider=configured_master_keys({'FG_GUARD_MASTER_KEY_FILE':str(self.root/'old.key'),'FG_GUARD_KEY_ID':'old'})
         self.assertEqual(provider('old'),self.old)
         with self.assertRaises(PermissionError):provider('new')
+
+    def test_rotation_command_authenticates_and_never_exposes_secrets(self):
+        from operations_keys import main
+        from io import StringIO
+        from contextlib import redirect_stdout
+        f=fixtures.CustomerSitesTests();f.setUp();self.addCleanup(f.doCleanups)
+        ring={'test-key':f.master,'new':self.new}
+        env={'FG_CUSTOMER_AUTH_DB':str(f.root/'auth.sqlite'),'FG_CUSTOMER_DATA_ROOT':str(f.service.root),'FG_GUARD_KEY_ID':'new'}
+        output=StringIO()
+        with patch.dict(os.environ,env,clear=True),patch('operations_keys.configured_master_keys',return_value=ring.__getitem__),patch('getpass.getpass',return_value='Alice-isolated-password-123'),redirect_stdout(output):
+            self.assertEqual(main(['--account','alice','--site-id',f.site_a]),0)
+        self.assertIn('rotated',output.getvalue());self.assertNotIn('password',output.getvalue())
+        output=StringIO()
+        with patch.dict(os.environ,env,clear=True),patch('getpass.getpass',return_value='incorrect'),redirect_stdout(output):
+            self.assertEqual(main(['--account','alice','--site-id',f.site_a]),1)
+        self.assertNotIn('incorrect',output.getvalue())

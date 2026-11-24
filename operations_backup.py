@@ -4,6 +4,8 @@ No implicit network, real key generation, deletion or WordPress writes. Receipt
 and mounted master-key custody must survive separately from the Streamlit host.
 """
 import argparse
+import os
+import sqlite3
 import json
 from pathlib import Path
 import re
@@ -48,16 +50,51 @@ def recover_customer_archive(store,master_keys,manifest,destination):
     return restore_encrypted_copy(ciphertext,key,destination,expected_sha256=manifest['ciphertext_sha256'])
 
 
+def export_recovery_manifest(root,customer_id,site_id,backup_id,destination):
+    """Read trusted local receipts and copy recovery metadata without DB edits.
+
+    Store this private metadata separately from the host; it contains no keys.
+    It identifies one content archive, never an entire site/application backup.
+    """
+    for value in (customer_id,site_id):
+        if type(value) is not str or not re.fullmatch('[0-9a-f]{32}',value):raise ValueError('Invalid recovery identifier')
+    if type(backup_id) is not str or not re.fullmatch('[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',backup_id):raise ValueError('Invalid backup identifier')
+    root=Path(root)
+    def connect(path):
+        # File checks must precede SQLite opening (avoid accidental creation).
+        private_file(path,128*1024*1024)
+        return sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True)
+    db=connect(root/'sites.sqlite')
+    try:
+        if db.execute('SELECT 1 FROM customer_sites WHERE customer_id=? AND site_id=?',(customer_id,site_id)).fetchone() is None:
+            raise PermissionError('Recovery site binding unavailable')
+    finally:db.close()
+    db=connect(root/'customers'/customer_id/'sites'/site_id/'receipts.sqlite');db.row_factory=sqlite3.Row
+    try:row=db.execute('SELECT * FROM external_backups WHERE backup_id=?',(backup_id,)).fetchone()
+    finally:db.close()
+    if row is None:raise ValueError('Recovery receipt unavailable')
+    manifest={'customer_id':customer_id,'site_id':site_id,'scope':'resource_content_only',
+        **{field:row[field] for field in ('object_id','ciphertext_sha256','key_id')}}
+    fd=os.open(destination,os.O_CREAT|os.O_EXCL|os.O_WRONLY,0o600)
+    with os.fdopen(fd,'w') as out:
+        json.dump(manifest,out);out.flush();os.fsync(out.fileno())
+    return {'status':'saved','scope':'resource_content_only','contains_keys':False}
+
+
 def main(argv=None):
     parser=argparse.ArgumentParser(description='Authorized external content-backup verification; never writes WordPress')
-    parser.add_argument('operation',choices=['probe','recover'])
+    parser.add_argument('operation',choices=['probe','recover','manifest'])
     parser.add_argument('--authorized-external-access',action='store_true')
     parser.add_argument('--manifest');parser.add_argument('--destination')
+    parser.add_argument('--customer-id');parser.add_argument('--site-id');parser.add_argument('--backup-id')
     args=parser.parse_args(argv)
-    if not args.authorized_external_access:
+    if args.operation!='manifest' and not args.authorized_external_access:
         print(json.dumps({'status':'blocked','reason':'Explicit operator authorization required'}));return 2
     try:
-        if args.operation=='recover':
+        if args.operation=='manifest':
+            if not args.destination:raise ValueError()
+            result=export_recovery_manifest(os.environ['FG_CUSTOMER_DATA_ROOT'],args.customer_id,args.site_id,args.backup_id,args.destination)
+        elif args.operation=='recover':
             if not args.manifest or not args.destination:raise ValueError()
             # Refuse an existing destination before any external call.
             if Path(args.destination).exists() or Path(args.destination).is_symlink():raise ValueError()
