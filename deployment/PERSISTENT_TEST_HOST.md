@@ -35,7 +35,9 @@ port publicly or enable production repair flags to make configuration pass.
 
 The CI proof builds the actual image, checks Streamlit health, creates a synthetic
 account and a simulated cached AI selection, stops/starts the UI container, then
-logs in again and verifies the same cache and call budget. It launches the actual
+logs in again and verifies the same cache, call budget, monitoring history and
+notification records. The schedule uses synthetic ownership metadata and a local
+fixture scanner; it is not proof of a real WordPress authorization. It launches the actual
 worker entry point in a fresh container against the same volume, without secrets
 or due public scans. This tests container/process restart, not provider uptime,
 physical-host reboot, power failure or the real Groq model. Existing account and

@@ -29,3 +29,21 @@ receipt is labelled historical and `real_inference_executed=false` for that run.
 Corrupt/incomplete receipts fail closed instead of silently repeating a call.
 The receipt is evidence of this small test, never customer/site authorization,
 backup proof or commercial-release approval. No new quality scores are inferred.
+
+
+## Owner continuation
+
+The one-cell loader is `colab_validate_app_ai.py`. It pins the validated test
+implementation, installs existing app dependencies into the current free CPU
+runtime without restarting it, requires the existing ledger and all nine prior
+successes, and reuses the existing in-memory key before considering one Secrets
+RPC. The copied session-only holder is invalidated after the probe without
+changing the owner's existing holder/key. No credential is saved to disk/env.
+
+This is at most one new, distinct app-integration call, not another quality-suite
+run. A daily/provider limit blocks it normally; no ledger, cooldown, allowance or
+old reservation is reset. The result is automatically downloaded as
+`app-ai-validation-*.json`. An accepted real receipt is saved privately beside the
+ledger so another execution costs zero new calls. The nine prior successes remain
+unchanged. This live step cannot be executed in the development worker because
+it has no authorized access to the owner's Colab-only key.
