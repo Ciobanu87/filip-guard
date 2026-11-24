@@ -32,7 +32,7 @@ separately. Passing this suite does not demonstrate compatibility with arbitrary
 WordPress plugins, page builders, multisite or hosting-specific behavior.
 
 
-The real suite contains 17 tests. It uses a fixture-only MU-plugin to observe real
+The real suite uses a fixture-only MU-plugin to observe real
 save hooks and to inject a deterministic title change immediately before the SQL
 CAS. Another fixture hook changes a title during save; the companion must report
 uncertainty rather than success. No marketplace plugin compatibility is claimed.
@@ -53,3 +53,16 @@ disposable SQL server, with a distinct .test hostname and TLS certificate. It us
 two customer accounts to verify administrative site proof, separate workspaces,
 scoped credentials/backups, rejected cross-account approvals and blocked writes
 when the simulated external archive is corrupt. Object storage remains simulated.
+
+The suite now also exercises read-only Commerce/API checks against the actual
+WordPress public HTML and REST JSON, and certificate-expiry extraction from the
+actual hostname-verified TLS connection. DNS failure is explicitly injected in
+that case because the disposable `.test` site has no public DNS; no registry date
+is invented. The resource snapshot is unchanged, and reading stored WordPress
+credentials is forbidden during the checks.
+
+A separate real-file proof serves only the exact verification `.txt` path from
+the disposable PHP fixture. A new account with no WordPress password proves
+control over HTTPS, receives a read-only resource binding and cannot replay the
+same nonce. The fixture router exception and connector mapping are test-only;
+production transport, certificate checks and repair gates remain unchanged.

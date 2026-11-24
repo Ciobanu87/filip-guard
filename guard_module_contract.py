@@ -50,6 +50,7 @@ def configure(origin,settings):
             require=item.get('require_product',False);currency=item.get('expected_currency')
             if type(require) is not bool or (currency is not None and (type(currency) is not str or not re.fullmatch('[A-Z]{3}',currency))):
                 raise ValueError('Invalid product expectations')
+            if currency is not None and not require:raise ValueError('Currency expectations require product metadata checks')
             result[name]={'paths':paths(item.get('paths')),'require_product':require,'expected_currency':currency}
         elif name=='api':
             if set(item)-{'paths','statuses','require_json','required_keys','json_equals'}:raise ValueError('Unknown API setting')

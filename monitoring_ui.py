@@ -12,7 +12,7 @@ def render_monitoring(st_module=None,*,service=None):
     if st_module is None:
         import streamlit as st_module
     ui=st_module
-    with ui.expander('Website monitoring',expanded=False):
+    with ui.expander('Website and service monitoring',expanded=False):
         try:service=service if service is not None else configured_monitoring()
         except Exception:
             ui.warning('Monitoring is unavailable for this deployment.');return

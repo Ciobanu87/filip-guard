@@ -38,6 +38,7 @@ class GuardContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):configure('https://example.com',{'api':{'paths':['/health'],'required_keys':['token']}})
         with self.assertRaises(ValueError):configure('https://example.com',{'infrastructure':{'registered_domain':'other.com'}})
         with self.assertRaises(ValueError):configure('https://example.com',{'infrastructure':{'expected_ips':['127.0.0.1']}})
+        with self.assertRaises(ValueError):configure('https://example.com',{'commerce':{'paths':['/'],'expected_currency':'EUR'}})
         for status in (206,301,304):
             with self.assertRaises(ValueError):configure('https://example.com',{'api':{'paths':['/health'],'statuses':[status]}})
         self.assertEqual(configure('https://shop.example.com',{'infrastructure':{'registered_domain':'example.com'}})['infrastructure']['registered_domain'],'example.com')
@@ -59,6 +60,8 @@ class ModuleBehaviorTests(unittest.TestCase):
         checks=list(api_app_guard.run(Context((200,'application/json',b'{"status":"error"}')),config))
         self.assertEqual(checks[-1].status,'fail')
         self.assertNotIn('error',json.dumps(checks[-1].evidence))
+        boolean=configure(Context.origin,{'api':{'paths':['/health'],'json_equals':{'ready':True}}})['api']
+        self.assertEqual(list(api_app_guard.run(Context((200,'application/json',b'{"ready":1}')),boolean))[-1].status,'fail')
         with self.assertRaises(ValueError):configure(Context.origin,{'api':{'paths':['/health'],'json_equals':{'status':'gsk_ABCDEFGHIJKLMNOPQRSTUVWXYZ'}}})
 
     def test_invalid_duplicate_json_and_secrets_never_enter_module_results(self):
@@ -81,6 +84,9 @@ class ModuleBehaviorTests(unittest.TestCase):
         self.assertEqual(list(commerce_guard.run(Context((200,'text/html',b'<h1>Table</h1>')),config))[-1].status,'fail')
         product['offers']={'@type':'AggregateOffer','lowPrice':'10','highPrice':'20','priceCurrency':'EUR'}
         html='<script type="application/ld+json">'+json.dumps(product)+'</script>'
+        self.assertEqual(list(commerce_guard.run(Context((200,'text/html',html.encode())),config))[-1].status,'pass')
+        product['@type']='https://schema.org/Product'
+        html='<script type="Application/LD+JSON">'+json.dumps(product)+'</script>'
         self.assertEqual(list(commerce_guard.run(Context((200,'text/html',html.encode())),config))[-1].status,'pass')
 
     def test_dns_and_tls_expiry_are_verified_not_guessed(self):

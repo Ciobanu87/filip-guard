@@ -186,7 +186,10 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
         keyfile.chmod(0o600)
         raw_socket=socket.socket();raw_socket.bind(('127.0.0.1',0));self.http_port=raw_socket.getsockname()[1];raw_socket.close()
         router=self.root/'router.php'
-        router.write_text("<?php $_SERVER['HTTPS']='on'; $_SERVER['SERVER_PORT']='443'; require "+php_quote(self.wp/'index.php')+";\n")
+        proof_file=self.wp/'.well-known/filip-guard-verification.txt'
+        router.write_text("<?php $_SERVER['HTTPS']='on'; $_SERVER['SERVER_PORT']='443'; "
+            "if ($_SERVER['REQUEST_URI']==='/.well-known/filip-guard-verification.txt' && is_file("+php_quote(proof_file)+")) return false; "
+            "require "+php_quote(self.wp/'index.php')+";\n")
         log=self.stack.enter_context(open(self.root/'php-server.log','w'))
         self.php_server_command = self.php_args + ['-S', '127.0.0.1:' + str(self.http_port), '-t', str(self.wp), str(router)]
         self.php_server_log = log
@@ -254,6 +257,7 @@ if(!$d->query('CREATE DATABASE `'.$p['database'].'` CHARACTER SET utf8mb4')){exi
             buffered = None
             fault = None
             def settimeout(self, timeout): connection.settimeout(timeout)
+            def getpeercert(self, *args, **kwargs): return connection.getpeercert(*args, **kwargs)
             def close(self): connection.close()
             def sendall(self, wire):
                 header, _, body = wire.partition(b'\r\n\r\n')
@@ -629,6 +633,52 @@ class RealWordPressTests(unittest.TestCase):
         self.assertEqual(monitor.run_once()['status'],'idle')
         monitor.configure(token,site,enabled=False)
         self.assertEqual(monitor.run_once()['status'],'idle')
+
+    def test_real_public_guard_modules_use_wordpress_html_json_and_verified_tls_without_repairs(self):
+        from customer_auth import CustomerAuth
+        from customer_sites import CustomerSites
+        from monitoring_service import MonitoringService
+        root=Path(self.temp.name);auth=CustomerAuth(root/'guard-accounts.sqlite')
+        auth.register('guard-owner','Real-guard-owner-password');token=auth.login('guard-owner','Real-guard-owner-password')
+        master=secrets.token_bytes(32)
+        directory=CustomerSites(auth,root/'guard-sites',lambda _:master,gateway_factory=WordPressRESTGateway)
+        site=directory.connect(token,self.fixture.site_url,'fg-admin',self.fixture.admin_password)['site_id']
+        monitor=MonitoringService(directory,root/'guard-monitor.sqlite')
+        monitor.configure_modules(token,site,{'website':False,'commerce':{'paths':['/']},
+            'api':{'paths':['/wp-json/'],'required_keys':['name'],'json_equals':{'name':'FILIP GUARD isolated fixture'}},
+            'infrastructure':{'warn_days':1}})
+        monitor.configure(token,site,enabled=True,page_limit=1,max_requests=6)
+        before=self.snapshot()
+        with patch.object(directory,'_credentials',side_effect=AssertionError('Guards cannot read WordPress credentials')), \
+             patch('guard_network.create_verified_connection',side_effect=self.fixture.connector), \
+             patch('guard_network.resolve_public_ips',side_effect=OSError('Fixture has no public DNS')):
+            result=monitor.run_once()
+        self.assertFalse(result['repairs_authorized']);self.assertEqual(self.snapshot(),before)
+        checks=monitor.history(token,site)[0]['report']['module_checks']
+        self.assertTrue(any(c['module']=='commerce' and c['status']=='pass' for c in checks))
+        self.assertTrue(any(c['module']=='api' and c['code']=='json-contract' and c['status']=='pass' for c in checks))
+        self.assertTrue(any(c['code']=='tls-expiry' and c['status'] in ('pass','fail') and c['evidence'] for c in checks))
+        self.assertTrue(any(c['code']=='dns' and c['status']=='unknown' for c in checks))
+        self.assertTrue(all(c['autofix'] is False for c in checks))
+
+    def test_real_domain_file_proof_grants_only_read_only_resource_without_wordpress_login(self):
+        from customer_auth import CustomerAuth
+        from customer_sites import CustomerSites
+        from guard_assets import GuardAssetDirectory
+        root=Path(self.temp.name);auth=CustomerAuth(root/'proof-accounts.sqlite')
+        auth.register('domain-owner','Real-domain-owner-password');token=auth.login('domain-owner','Real-domain-owner-password')
+        wordpress=CustomerSites(auth,root/'proof-sites',None)
+        directory=GuardAssetDirectory(wordpress)
+        proof=directory.begin_proof(token,self.fixture.site_url,'api')
+        target=self.fixture.wp/'.well-known/filip-guard-verification.txt';target.parent.mkdir(exist_ok=True)
+        target.write_text(proof['token'])
+        try:
+            with patch.object(wordpress,'_credentials',side_effect=AssertionError('No WordPress credentials required')):
+                asset=directory.confirm_proof(token,self.fixture.site_url,proof['token'])
+            self.assertEqual(directory.list_sites(token)[0]['site_id'],asset['site_id'])
+            self.assertEqual(asset['guard_kind'],'api')
+            with self.assertRaises(PermissionError):directory.confirm_proof(token,self.fixture.site_url,proof['token'])
+        finally:target.unlink()
 
     def test_real_conditional_restore_and_idempotency(self):
         original=self.snapshot()

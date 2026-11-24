@@ -24,9 +24,9 @@ def run(context,config):
                     for item in value[:100]:walk(item,depth+1)
                 elif isinstance(value,dict):
                     types=value.get('@type',[]);types=[types] if type(types) is str else types
-                    if isinstance(types,list) and 'Product' in types:products.append(value)
+                    if isinstance(types,list) and any(item in ('Product','https://schema.org/Product','http://schema.org/Product') for item in types):products.append(value)
                     if '@graph' in value:walk(value['@graph'],depth+1)
-            for script in soup.select('script[type="application/ld+json"]')[:10]:
+            for script in soup.find_all('script',type=lambda value:isinstance(value,str) and value.lower().split(';')[0].strip()=='application/ld+json')[:10]:
                 raw=script.string or script.get_text()
                 if len(raw)>100000:raise ValueError('Product metadata too large')
                 walk(context.json(raw.encode()))
@@ -40,7 +40,7 @@ def run(context,config):
             for offer in offers:
                 if type(offer) is not dict:errors.append('invalid-offer');continue
                 try:
-                    aggregate=offer.get('@type')=='AggregateOffer'
+                    aggregate=offer.get('@type') in ('AggregateOffer','https://schema.org/AggregateOffer','http://schema.org/AggregateOffer')
                     price=Decimal(str(offer.get('lowPrice','') if aggregate else offer.get('price','')))
                     if not price.is_finite() or price<0:raise InvalidOperation()
                     if aggregate and 'highPrice' in offer:
