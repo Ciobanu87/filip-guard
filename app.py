@@ -13,6 +13,7 @@ from ai_advisor import analyze_pages, suggest_meta_description
 from website_scanner import HEADERS, MAX_BYTES, public_host, validate_url, fetch, normalize_link, scan
 from link_resolver import suggest_replacements
 from wordpress_autofix_ui import render_wordpress_autofix_ui
+from wordpress_autofix_sandbox_ui import render_autofix_sandbox
 from customer_account_ui import render_customer_account
 from guard_application_ui import render_guard_application
 from monitoring_ui import render_monitoring
@@ -154,6 +155,7 @@ if result is not None:
 
 st.caption('Beta: checks HTML SEO signals and internal links only. Not a complete SEO, performance or security audit. Scan sites you own or are authorized to audit.')
 render_wordpress_autofix_ui()
+render_autofix_sandbox()
 
 
 render_monitoring()

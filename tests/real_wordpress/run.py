@@ -377,7 +377,7 @@ class RealWordPressTests(unittest.TestCase):
             self.assertEqual(repair['repair']['result']['status'],'applied')
             self.assertTrue(store.objects)
             click('Recheck changed page')
-            self.assertNotIn(missing,[x['url'] for x in app.scan_record(session,site)['report']['broken']])
+            self.assertNotIn(missing,[x['link'] for x in app.scan_record(session,site)['report']['broken']])
             click('Review rollback')
             next(x for x in at.checkbox if x.label=='I approve exactly this change').check();run()
             click('Approve and apply test change')
