@@ -332,6 +332,8 @@ class RealWordPressTests(unittest.TestCase):
         from guard_application import GuardApplication
         from monitoring_service import MonitoringService
         from monitoring_scan import SecureMonitoringScan
+        from contextual_advisor import ContextualAdvisor
+        from test_contextual_advisor import SimulatedProvider
         from test_verified_external_backups import MemoryStore
         root=Path(self.temp.name)
         destination=int(self.fixture.wpcli('post','create','--post_type=page','--post_status=publish',
@@ -351,7 +353,8 @@ class RealWordPressTests(unittest.TestCase):
         monitor=MonitoringService(sites,root/'ui-monitor.sqlite',scanner=scanner)
         app=GuardApplication(sites,monitor,authorized_test_origins=[self.fixture.site_url],
             scanner=scanner,simulated_storage=True,allow_registration=True)
-        with patch('guard_application_ui.configured_guard_application',return_value=app):
+        simulated_advisor=ContextualAdvisor(root/'ui-model-ledger.sqlite',SimulatedProvider())
+        with patch('guard_application_ui.configured_guard_application',return_value=app),patch('contextual_advisor.configured_advisor',return_value=simulated_advisor):
             at=AppTest.from_file(str(ROOT/'app.py'),default_timeout=90).run()
             def run():
                 at.run();self.assertEqual(list(at.exception),[])
@@ -367,6 +370,9 @@ class RealWordPressTests(unittest.TestCase):
             next(x for x in at.selectbox if x.label=='Page to scan').set_value(source_url)
             next(x for x in at.number_input if x.label=='Maximum pages for this scan').set_value(1)
             click('Scan authorized site')
+            click('Analyze context with AI')
+            self.assertEqual(app.advice(session,site)['status'],'model-assisted')
+            self.assertTrue(all(x['autofix'] is False for x in app.advice(session,site)['recommendations']))
             self.assertTrue(app.proposals(session,site,app.scan_record(session,site)['scan_id']))
             next(x for x in at.selectbox if x.label=='Replacement page').set_value(replacement)
             click('Prepare exact repair proposal')
@@ -398,7 +404,7 @@ class RealWordPressTests(unittest.TestCase):
                     'status':'passed','wordpress':'real','database':'real MySQL',
                     'entrypoint':'app.py','journey':['register','authorize','scan','advisor','diff','explicit approval',
                         'encrypted verified backup','REST write','verify','explicit rollback','monitor','notifications','new login'],
-                    'external_object_store':'simulated','email':'not sent','production':'disabled'},indent=2))
+                    'model_inference':'simulated-contract-only','external_object_store':'simulated','email':'not sent','production':'disabled'},indent=2))
 
     def test_real_auth_and_permissions(self):
         self.assertEqual(self.snapshot().content,'<p>Original</p>')

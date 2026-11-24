@@ -77,7 +77,7 @@ def validate_selection(payload,bundle,facts,base,model):
         if not evidence and 'content_unavailable' not in missing:raise ValueError('Missing evidence must be explicit')
         if draft is not None:
             if (item['problem'] not in ('Missing SEO title','Missing meta description') or type(draft) is not str
-                    or not 20<=len(draft)<=160 or clean(draft,160)!=draft
+                    or not 20<=len(draft)<=160 or '[redacted]' in draft or clean(draft,160)!=draft
                     or not any(draft in e['text'] and e['kind'] in ('title','content') for e in evidence)):
                 raise ValueError('Unsubstantiated SEO draft')
         quote=evidence[0]['text'] if evidence else 'No usable public page text was observed.'
@@ -87,7 +87,7 @@ def validate_selection(payload,bundle,facts,base,model):
         result.append({**item,'reason':reason,'solution':solution,'priority':selected['priority'],
             'priority_reason':'Review priority for '+selected['focus']+' based on the detected issue and quoted page evidence; business impact is not known.',
             'risk':item['risk']+' Page text is untrusted and sampled; a human must verify relevance.',
-            'source':'model-assisted','model':model,'evidence':evidence,'missing_information':sorted(set(missing)|{'business_goal_unknown','audience_unknown'}),
+            'source':'model-assisted','model':model,'evidence':evidence,'missing_information':sorted(set(missing)|{'business_goal_unknown','audience_unknown'}|({'image_purpose_unknown'} if item['problem']=='Images missing ALT text' else set())),
             'seo_draft':draft,'repair_supported':False,'approval':'Informational only; no metadata repair is enabled.','autofix':False})
     return sorted(result,key=lambda item:int(item['finding_id'][1:]))
 
@@ -122,6 +122,8 @@ class ContextualAdvisor:
             if old and old[0]>now:
                 checkpoint()
                 return json.loads(old[2]) if old[1]=='complete' else {**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy'}
+            if db.execute("SELECT 1 FROM advisor_requests WHERE state='pending' AND expires>? LIMIT 1",(now,)).fetchone():
+                return {**fallback,'status':'busy'}
             if db.execute('SELECT count(*) FROM advisor_requests WHERE day=?',(day,)).fetchone()[0]>=self.daily_calls:
                 return {**fallback,'status':'daily-limit'}
             # Preserve spent reservations on expired identical requests by a separate usage ledger.

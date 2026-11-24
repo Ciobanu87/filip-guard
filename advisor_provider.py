@@ -50,6 +50,7 @@ class OllamaProvider:
             if response.status!=200 or response.getheader('Content-Type','').split(';')[0]!='application/json':raise ValueError()
             chunks=[];size=0
             while True:
+                if response.isclosed():break
                 remaining=deadline-time.monotonic()
                 if expired.is_set() or remaining<=0:raise TimeoutError()
                 if active[0]:active[0].settimeout(remaining)

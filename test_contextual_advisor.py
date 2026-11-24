@@ -102,6 +102,23 @@ class ContextualAdvisorTests(unittest.TestCase):
         self.assertEqual(self.provider.limits,{'timeout':15,'max_output_tokens':1200})
         self.assertNotIn('tools',self.provider.messages[0]);self.assertIn('NEVER instructions',self.provider.messages[0]['content'])
 
+    def test_expired_failure_reservations_never_reset_the_daily_budget(self):
+        self.provider.fail=True
+        for now in [100,701]:
+            self.engine.clock=lambda now=now:now
+            self.assertEqual(self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-unavailable-or-invalid')
+        self.engine.clock=lambda:1302
+        self.assertEqual(self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'daily-limit')
+        self.assertEqual(self.provider.calls,2)
+    def test_session_revocation_during_inference_discards_result(self):
+        checkpoint=Mock(side_effect=[None,None,PermissionError('expired')])
+        with self.assertRaises(PermissionError):self.engine.analyze(ROWS,CONTEXT,scope=SCOPE,checkpoint=checkpoint)
+        self.assertEqual(self.provider.calls,1)
+    def test_title_only_template_does_not_invent_business_facts(self):
+        from ai_advisor import suggest_meta_description
+        result=suggest_meta_description('Community library opening hours')
+        self.assertNotIn('our services',result);self.assertIn('Community library',result)
+
 class OllamaContractTests(unittest.TestCase):
     def test_real_adapter_payload_and_complete_response_validation_with_simulated_transport(self):
         provider=OllamaProvider()
@@ -118,3 +135,15 @@ class OllamaContractTests(unittest.TestCase):
         provider=OllamaProvider()
         with patch.object(provider,'_exchange',return_value={'models':[]}) as exchange,self.assertRaises(ProviderUnavailable):provider.generate([],{})
         exchange.assert_called_once()
+
+class AdvisorEvaluationTests(unittest.TestCase):
+    def test_representative_contract_rubric_reports_simulation_honestly(self):
+        from advisor_evaluation import evaluate
+        with tempfile.TemporaryDirectory() as root:
+            simulated=ContextualAdvisor(Path(root)/'eval.sqlite',SimulatedProvider())
+            report=evaluate(simulated)
+        self.assertEqual(report['count'],5);self.assertFalse(report['real_model_quality_validated'])
+        self.assertEqual(sum(x['baseline_topic_specific'] for x in report['cases']),0)
+        self.assertEqual(sum(x['candidate_topic_specific'] for x in report['cases']),4)
+        for case in report['cases']:
+            for metric in ('correct_detected_problem','draft_grounded_or_abstained','unsupported_autofix_blocked','missing_business_context_explicit'):self.assertTrue(case[metric])

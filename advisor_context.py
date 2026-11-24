@@ -61,4 +61,7 @@ def evidence_bundle(rows,contexts=None,broken=()):
             identifier='f'+str(len(findings))
             findings.append({'id':identifier,'page_id':page_id,'problem':item['problem'],'minimum_priority':item['priority']})
             base.append({**item,'finding_id':identifier,'page_id':page_id})
-    return {'version':VERSION,'pages':pages[:30],'findings':findings},facts,base
+    referenced={item['page_id'] for item in findings}
+    pages=[page for page in pages if page['id'] in referenced]
+    facts={key:fact for key,fact in facts.items() if any(key.startswith(page+'e') for page in referenced)}
+    return {'version':VERSION,'pages':pages,'findings':findings},facts,base
