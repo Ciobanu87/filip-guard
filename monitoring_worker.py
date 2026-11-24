@@ -8,9 +8,10 @@ import json
 import signal
 import threading
 from monitoring_configuration import configured_monitoring
+from monitoring_email_configuration import configured_email_dispatcher
 
 
-def main(argv=None,*,service=None,stop_event=None):
+def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
     parser=argparse.ArgumentParser(description='FILIP GUARD authorized read-only monitoring worker')
     parser.add_argument('--once',action='store_true')
     parser.add_argument('--poll-seconds',type=int,default=30)
@@ -23,6 +24,9 @@ def main(argv=None,*,service=None,stop_event=None):
         print(json.dumps({'status':'configuration_unavailable'}));return 2
     if service is None:
         print(json.dumps({'status':'not_configured'}));return 2
+    try:email_dispatcher=email_dispatcher if email_dispatcher is not None else configured_email_dispatcher(service)
+    except Exception:
+        print(json.dumps({'status':'email_configuration_unavailable'}));return 2
     stop=stop_event if stop_event is not None else threading.Event()
     previous={}
     if threading.current_thread() is threading.main_thread():
@@ -38,6 +42,7 @@ def main(argv=None,*,service=None,stop_event=None):
                     if status=='idle':break
                     summary['processed']+=1
                     if status in ('complete','partial','error'):summary[status]+=1
+                summary['email']=email_dispatcher.dispatch_once() if email_dispatcher is not None else {'status':'disabled','sent':0}
             except Exception:
                 summary['error']+=1
                 print(json.dumps(summary))

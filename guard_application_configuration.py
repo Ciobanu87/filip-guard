@@ -8,7 +8,7 @@ import os
 from operator_secrets import private_file as _private_file,configured_master_keys
 from customer_auth import CustomerAuth
 from customer_sites import CustomerSites
-from external_backup_store import S3BackupConfig,configured_s3_store
+from infrastructure_configuration import configured_external_store
 from guard_application import GuardApplication
 from monitoring_service import MonitoringService
 from wordpress_rest_gateway import WordPressRESTGateway
@@ -29,11 +29,7 @@ def configured_guard_application():
         raise ValueError('Only isolated .test sites may be enabled')
     key_id=os.environ.get('FG_GUARD_KEY_ID','test-v1')
     master_keys=configured_master_keys()
-    def storage_credentials():
-        data=json.loads(_private_file(os.environ['FG_GUARD_S3_CREDENTIALS_FILE'],8192))
-        return (data['access_key_id'],data['secret_access_key']) if not data.get('session_token') else (
-            data['access_key_id'],data['secret_access_key'],data['session_token'])
-    store=configured_s3_store(S3BackupConfig(os.environ['FG_GUARD_S3_ENDPOINT'],os.environ['FG_GUARD_S3_BUCKET'],os.environ.get('FG_GUARD_S3_REGION','us-east-1')),storage_credentials)
+    store=configured_external_store()
     auth=CustomerAuth(os.environ['FG_CUSTOMER_AUTH_DB'])
     sites=CustomerSites(auth,os.environ['FG_CUSTOMER_DATA_ROOT'],master_keys,active_key_id=key_id,
                         object_store=store,gateway_factory=WordPressRESTGateway)
