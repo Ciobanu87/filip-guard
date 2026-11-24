@@ -59,6 +59,13 @@ retention or EU residency is made. Enable available data controls and obtain
 appropriate authorization before any client data use. The prepared live runner
 uses **synthetic** content only. Nothing has sent customer data in this session.
 
+## Current quota recovery
+
+The second owner report replayed a cached 429 without a new inference. See
+[AI_QUOTA_RECOVERY.md](AI_QUOTA_RECOVERY.md). The current notebook runs a single
+probe after quota admission; earlier seven-case instructions below are historical
+and must not be used to repeatedly retry a blocked organization.
+
 ## First real test from an Android phone
 
 Open the development notebook:

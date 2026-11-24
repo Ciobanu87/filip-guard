@@ -43,7 +43,7 @@ class ProviderCooldownTests(unittest.TestCase):
         with patch('advisor_groq.cloud_exchange') as exchange:
             result=self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)
         self.assertEqual(result['status'],'provider-cooldown');exchange.assert_not_called();self.assertEqual(self.calls(),7)
-        self.now=220
+        self.now=240
         with patch('advisor_groq.cloud_exchange',side_effect=self.valid):self.assertEqual(self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
         self.assertEqual(self.calls(),8)
     def test_unknown_legacy_expiry_is_conservative_not_presented_as_provider_reset(self):
@@ -52,7 +52,7 @@ class ProviderCooldownTests(unittest.TestCase):
         self.now=701
         with patch('advisor_groq.cloud_exchange') as exchange:result=self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)
         exchange.assert_not_called();self.assertEqual(result['status'],'provider-cooldown')
-        self.assertFalse(result['cooldown']['provider_expiry_confirmed']);self.assertEqual(result['cooldown']['eligible_at'],86500)
+        self.assertFalse(result['cooldown']['provider_expiry_confirmed']);self.assertEqual(result['cooldown']['eligible_at'],86520)
     def test_semantic_failures_remain_request_scoped_and_cached(self):
         with patch('advisor_groq.cloud_exchange',return_value=response({'recommendations':{}})) as exchange:
             first=self.engine.analyze(ROWS,CONTEXT,scope=SCOPE)

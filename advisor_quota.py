@@ -66,10 +66,15 @@ def record(db,provider,observed,diagnostic):
 
 
 def migrate_legacy(db,provider):
+    db.execute('CREATE TABLE IF NOT EXISTS advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
+    db.execute('INSERT OR IGNORE INTO advisor_budget SELECT day,count(*) FROM advisor_requests GROUP BY day')
     for started,result in db.execute("SELECT started,result FROM advisor_requests WHERE state='failed' AND result IS NOT NULL"):
         try:diagnostic=json.loads(result).get('diagnostic')
         except (ValueError,AttributeError):continue
-        if is_quota(diagnostic):record(db,provider,started,diagnostic)
+        if is_quota(diagnostic):
+            # Legacy rows recorded reservation time, not response time. Add the
+            # existing maximum 20s request duration rather than retry too early.
+            record(db,provider,started+20,diagnostic)
 
 
 def active(db,provider,now):

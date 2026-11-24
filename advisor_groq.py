@@ -84,6 +84,20 @@ def cloud_exchange(body,key,timeout):
         if connection is not None:connection.close()
 
 
+def build_payload(messages,schema,*,model=MODEL,max_output_tokens=1200):
+    content_bytes=sum(len(m['content'].encode('utf-8')) for m in messages)
+    schema_bytes=len(json.dumps(schema,separators=(',',':'),ensure_ascii=False).encode())
+    if content_bytes+schema_bytes>6000:raise AdvisorFailure('input_bound','input')
+    payload={'model':model,'messages':messages,'stream':False,'temperature':0,
+        'reasoning_effort':'none','reasoning_format':'hidden','max_completion_tokens':max_output_tokens,
+        'response_format':{'type':'json_schema','json_schema':{'name':'filip_guard_advice','strict':True,'schema':schema}}}
+    body=json.dumps(payload,ensure_ascii=False,separators=(',',':')).encode()
+    metrics={'request_bytes':len(body),'prompt_and_schema_bytes':content_bytes+schema_bytes,
+        'estimated_input_tokens_heuristic':(content_bytes+schema_bytes+3)//4,'max_output_tokens':max_output_tokens,
+        'token_estimate_method':'UTF-8 bytes / 4 heuristic; not provider accounting'}
+    return body,metrics
+
+
 class GroqFreeProvider:
     name='groq-free'
     selection_contract='indexed-evidence-v2'
@@ -95,15 +109,7 @@ class GroqFreeProvider:
         self.model=model;self.keys=key_provider;self.successful_exchanges=0;self.last_usage=None;self.last_diagnostic=None;self.attempted_exchanges=0;self.last_request_metrics=None;self.last_quota=None
     def generate(self,messages,schema,*,timeout=15,max_output_tokens=1200):
         if not 1<=timeout<=20 or not 64<=max_output_tokens<=1600:raise ValueError('Bounded inference required')
-        # Conservative input-byte bound in addition to the provider's token limits.
-        if sum(len(m['content'].encode('utf-8')) for m in messages)+len(json.dumps(schema).encode())>6000:
-            raise AdvisorFailure('input_bound','input')
-        # Schema constraints still undergo full independent semantic validation.
-        body=json.dumps({'model':self.model,'messages':messages,'stream':False,'temperature':0,
-            'reasoning_effort':'none','reasoning_format':'hidden','max_completion_tokens':max_output_tokens,
-            'response_format':{'type':'json_schema','json_schema':{'name':'filip_guard_advice','strict':True,'schema':schema}}},ensure_ascii=False,separators=(',',':')).encode()
-        self.last_request_metrics={'request_bytes':len(body),'prompt_and_schema_bytes':sum(len(m['content'].encode('utf-8')) for m in messages)+len(json.dumps(schema,separators=(',',':')).encode()),'max_output_tokens':max_output_tokens,'token_estimate_method':'UTF-8 bytes / 4 heuristic; not provider accounting'}
-        self.last_request_metrics['estimated_input_tokens_heuristic']=(self.last_request_metrics['prompt_and_schema_bytes']+3)//4
+        body,self.last_request_metrics=build_payload(messages,schema,model=self.model,max_output_tokens=max_output_tokens)
         self.last_diagnostic=None;self.last_usage=None;self.last_quota=None
         try:
             try:key=self.keys()
