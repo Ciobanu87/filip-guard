@@ -54,6 +54,8 @@ def create_verified_connection(hostname, timeout=15):
     return connect_pinned_addresses(hostname, addresses, deadline)
 
 
+PUBLIC_GUARD_ACCEPT = 'application/json,application/health+json,application/rdap+json,text/html,application/xhtml+xml,text/plain'
+
 MAX_RESPONSE_SIZE = 2 * 1024 * 1024
 MAX_HEADER_SIZE = 64 * 1024
 MAX_LINE_SIZE = 8192
@@ -215,7 +217,7 @@ def _https_get_exchange(hostname, path, timeout, *, headers=(), authorization=No
 def _https_request_exchange(hostname, path, timeout, *, headers=(), authorization=None,
                             method='GET', body=b'', accept='application/json'):
     """Bounded internal JSON GET/POST exchange; no redirect, retry or downgrade."""
-    if accept not in ('application/json', 'text/html,application/xhtml+xml'):
+    if accept not in ('application/json', 'text/html,application/xhtml+xml', PUBLIC_GUARD_ACCEPT):
         raise ValueError('Unsupported HTTPS Accept type')
     if method not in ('GET', 'POST') or type(body) is not bytes:
         raise ValueError('Unsupported HTTPS request')

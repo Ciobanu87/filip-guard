@@ -107,3 +107,15 @@ accepted nine-case Groq evaluation and prepared one-call authenticated-app probe
 remain separate; this extension does not claim that pending live probe ran.
 Permanent hosting, actual cloud recovery/key custody and real inbox delivery are
 still operator-access launch gates, as documented in `deployment/OPERATIONS.md`.
+
+
+## Real transport integration correction
+
+The additional real WordPress checks exposed an Accept-header mismatch hidden
+by isolated exchange mocks: the new guard requested a media bundle the shared
+transport did not recognize. The fix adds one explicit, constant public-guard
+media bundle to the existing allowlist. Arbitrary/wildcard/injected Accept values
+still fail before connection. Hostname/TLS verification, DNS pinning, redirects,
+response bounds, method/body restrictions and authorization checks are unchanged.
+A wire-level regression test now exercises the actual transport validator and
+checks anonymous GET/no-cookie behavior. No accepted Groq case is repeated.

@@ -165,3 +165,22 @@ class ComposedGuardTests(unittest.TestCase):
         self.assertEqual(failed.findings[0]['scope_kind'],'api:json-contract')
         self.assertIn(('api:json-contract','https://example.com/health'),passed.scope)
         self.assertEqual(passed.findings,())
+
+
+class GuardTransportIntegrationTests(unittest.TestCase):
+    def test_public_guard_media_passes_actual_transport_validation_and_remains_get_only(self):
+        from wordpress_secure_https import PUBLIC_GUARD_ACCEPT
+        connection=Mock();connection.recv.side_effect=[b'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}',b'']
+        with patch('wordpress_secure_https.create_verified_connection',return_value=connection):
+            status,kind,body=GuardNetwork('https://example.com').site('/health')
+        self.assertEqual((status,kind,body),(200,'application/json',b'{}'))
+        wire=connection.sendall.call_args.args[0]
+        self.assertTrue(wire.startswith(b'GET /health '));self.assertIn(('Accept: '+PUBLIC_GUARD_ACCEPT).encode(),wire)
+        self.assertNotIn(b'Authorization:',wire);self.assertNotIn(b'Cookie:',wire);connection.close.assert_called_once()
+
+    def test_unrecognized_or_injected_accept_header_still_fails_before_network(self):
+        from wordpress_secure_https import _https_request_exchange,PUBLIC_GUARD_ACCEPT
+        for accept in ('*/*',PUBLIC_GUARD_ACCEPT+'\r\nAuthorization: bad'):
+            with patch('wordpress_secure_https.create_verified_connection') as connect:
+                with self.assertRaises(ValueError):_https_request_exchange('example.com','/',8,accept=accept)
+                connect.assert_not_called()

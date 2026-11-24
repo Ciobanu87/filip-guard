@@ -3,7 +3,7 @@ import json
 import ssl
 import time
 from monitoring_scan import target_url,MonitoringLimit
-from wordpress_secure_https import _https_request_exchange,parse_http_response,resolve_public_ips,create_verified_connection
+from wordpress_secure_https import _https_request_exchange,parse_http_response,resolve_public_ips,create_verified_connection,PUBLIC_GUARD_ACCEPT
 
 
 class GuardNetwork:
@@ -24,7 +24,7 @@ class GuardNetwork:
         host,path,_=target_url(url,None if authority else self.host)
         timeout=self.slot()
         response=parse_http_response(_https_request_exchange(host,path,timeout,
-            headers=(('User-Agent','FilipGuardModules/1.0'),),accept='application/json,application/rdap+json,text/html'))
+            headers=(('User-Agent','FilipGuardModules/1.0'),),accept=PUBLIC_GUARD_ACCEPT))
         if response.status==206 or 300<=response.status<400:raise ValueError('Partial responses and redirects are not accepted')
         if len(response.body)>1_500_000:raise ValueError('Module response exceeds bound')
         # Do not store cookies, authorization, bodies or sensitive headers.

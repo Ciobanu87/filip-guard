@@ -655,7 +655,7 @@ class RealWordPressTests(unittest.TestCase):
             result=monitor.run_once()
         self.assertFalse(result['repairs_authorized']);self.assertEqual(self.snapshot(),before)
         checks=monitor.history(token,site)[0]['report']['module_checks']
-        self.assertTrue(any(c['module']=='commerce' and c['status']=='pass' for c in checks))
+        self.assertTrue(any(c['module']=='commerce' and c['status']=='pass' for c in checks),json.dumps(checks))
         self.assertTrue(any(c['module']=='api' and c['code']=='json-contract' and c['status']=='pass' for c in checks))
         self.assertTrue(any(c['code']=='tls-expiry' and c['status'] in ('pass','fail') and c['evidence'] for c in checks))
         self.assertTrue(any(c['code']=='dns' and c['status']=='unknown' for c in checks))
@@ -670,11 +670,18 @@ class RealWordPressTests(unittest.TestCase):
         wordpress=CustomerSites(auth,root/'proof-sites',None)
         directory=GuardAssetDirectory(wordpress)
         proof=directory.begin_proof(token,self.fixture.site_url,'api')
+        observed=[];read=directory.reader
+        def observed_read(origin):
+            status,kind,body=read(origin)
+            observed.append({'http_status':status,'content_type':kind,'body_matches':body.strip()==proof['token'].encode()})
+            return status,kind,body
+        directory.reader=observed_read
         target=self.fixture.wp/'.well-known/filip-guard-verification.txt';target.parent.mkdir(exist_ok=True)
         target.write_text(proof['token'])
         try:
             with patch.object(wordpress,'_credentials',side_effect=AssertionError('No WordPress credentials required')):
-                asset=directory.confirm_proof(token,self.fixture.site_url,proof['token'])
+                try:asset=directory.confirm_proof(token,self.fixture.site_url,proof['token'])
+                except PermissionError:self.fail('Fixture proof verification failed; safe diagnostics: '+json.dumps(observed))
             self.assertEqual(directory.list_sites(token)[0]['site_id'],asset['site_id'])
             self.assertEqual(asset['guard_kind'],'api')
             with self.assertRaises(PermissionError):directory.confirm_proof(token,self.fixture.site_url,proof['token'])
