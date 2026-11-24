@@ -57,6 +57,7 @@ class MonitoringReport:
     requests: int
     discovered_links: tuple = ()
     page_context: tuple = ()
+    module_checks: tuple = ()
 
 
 def _text(value,limit=1000):
