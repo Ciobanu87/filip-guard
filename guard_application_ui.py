@@ -58,9 +58,10 @@ def render_guard_application(st_module=None,*,application=None):
             ui.write('Scanner results');ui.dataframe(scan['report']['rows'],hide_index=True)
             ui.write('AI Advisor recommendations')
             ui.caption('Rules detect problems. Optional AI selects sanitized public page evidence; it cannot authorize repairs.')
+            language=ui.selectbox('Advisor language',['en','ro'],key=prefix+'_advisor_language')
             if ui.button('Analyze context with AI',key=prefix+'_advisor_'+scan['scan_id']):
-                application.advice(session,site_id,scan['scan_id'],generate=True);ui.rerun()
-            advice=application.advice(session,site_id,scan['scan_id'])
+                application.advice(session,site_id,scan['scan_id'],generate=True,language=language);ui.rerun()
+            advice=application.advice(session,site_id,scan['scan_id'],language=language)
             render_advice(ui,advice)
             if scan['report']['broken']:ui.dataframe(scan['report']['broken'],hide_index=True)
             if not scan['report']['complete']:ui.warning('This scan is incomplete; absence of findings does not prove the site is healthy.')

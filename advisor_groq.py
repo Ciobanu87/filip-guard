@@ -96,7 +96,7 @@ class GroqFreeProvider:
         body=json.dumps({'model':self.model,'messages':messages,'stream':False,'temperature':0,
             'reasoning_effort':'none','reasoning_format':'hidden','max_completion_tokens':max_output_tokens,
             'response_format':{'type':'json_schema','json_schema':{'name':'filip_guard_advice','strict':True,'schema':schema}}},ensure_ascii=False).encode()
-        self.last_diagnostic=None
+        self.last_diagnostic=None;self.last_usage=None
         try:
             try:key=self.keys()
             except Exception:raise AdvisorFailure('key_unavailable','input') from None
@@ -111,9 +111,10 @@ class GroqFreeProvider:
             if type(usage) is not dict or any(type(usage.get(k)) is not int for k in ('prompt_tokens','completion_tokens','total_tokens')):raise ValueError()
             if not 0<usage['completion_tokens']<=max_output_tokens or not 0<usage['prompt_tokens']<=8192 or usage['total_tokens']!=usage['prompt_tokens']+usage['completion_tokens']:raise ValueError()
             payload=strict_json(message['content'])
+            self.last_diagnostic={'stage':'provider','code':'ok','http_status':200}
             self.successful_exchanges+=1;self.last_usage={k:usage[k] for k in ('prompt_tokens','completion_tokens','total_tokens')}
             return payload
         except AdvisorFailure as error:
             self.last_diagnostic=error.diagnostic;raise
         except Exception:
-            error=AdvisorFailure('response_rejected','provider');self.last_diagnostic=error.diagnostic;raise error from None
+            error=AdvisorFailure('response_rejected','provider',http_status=200);self.last_diagnostic=error.diagnostic;raise error from None

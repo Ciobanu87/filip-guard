@@ -135,13 +135,14 @@ class GuardApplication:
             return None
         return {**dict(row),'report':json.loads(row['report']),'inventory':json.loads(row['inventory'])}
 
-    def advice(self,session,site_id,scan_id=None,*,generate=False,advisor=None):
+    def advice(self,session,site_id,scan_id=None,*,generate=False,advisor=None,language='en'):
         """Authenticated on-demand advice. Monitoring never calls inference.
 
         Model output is stored alongside its immutable scan, separately from the
         deterministic findings used to form supported AutoFix plans.
         """
         from contextual_advisor import configured_advisor,rule_result
+        from advisor_language import render_language
         principal,_=self._owned(session,site_id)
         scan=self.scan_record(session,site_id,scan_id)
         if scan is None:return None
@@ -149,7 +150,7 @@ class GuardApplication:
         with self.db(session,site_id) as db:
             db.execute('CREATE TABLE IF NOT EXISTS application_advice (scan_id TEXT PRIMARY KEY,result TEXT NOT NULL)')
             old=db.execute('SELECT result FROM application_advice WHERE scan_id=?',(scan['scan_id'],)).fetchone()
-        if not generate:return json.loads(old[0]) if old else rule_result(scan['report']['rows'],contexts)
+        if not generate:return render_language(json.loads(old[0]) if old else rule_result(scan['report']['rows'],contexts),language)
         try:engine=advisor if advisor is not None else configured_advisor()
         except Exception:engine=None
         if engine is None:result=rule_result(scan['report']['rows'],contexts,status='model-not-configured')
@@ -159,7 +160,7 @@ class GuardApplication:
         self._owned(session,site_id)
         with self.db(session,site_id) as db:
             db.execute('INSERT OR REPLACE INTO application_advice VALUES (?,?)',(scan['scan_id'],json.dumps(result)))
-        return result
+        return render_language(result,language)
 
     def proposals(self,session,site_id,scan_id):
         scan=self.scan_record(session,site_id,scan_id);result=[]

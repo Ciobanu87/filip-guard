@@ -108,12 +108,14 @@ class ContextualAdvisor:
         try:
             with db:yield db
         finally:db.close()
-    def analyze(self,rows,contexts,*,scope,checkpoint=lambda:None):
+    def analyze(self,rows,contexts,*,scope,checkpoint=lambda:None,language='en'):
         import re
+        from advisor_language import render_language
+        if language not in ('en','ro'):raise ValueError('Unsupported advice language')
         if type(scope) is not str or not re.fullmatch('[0-9a-f]{32}:[0-9a-f]{32}',scope):raise PermissionError('Authenticated customer/site scope required')
         checkpoint();fallback=rule_result(rows,contexts)
         bundle,facts,base=evidence_bundle(rows,contexts)
-        if not base:return fallback
+        if not base:return render_language(fallback,language)
         # Bind cache to the original rows too, without sending private URLs to model.
         fingerprint=json.dumps([VERSION,self.provider.name,self.provider.model,bundle,rows],sort_keys=True,separators=(',',':'))
         digest=hashlib.sha256(fingerprint.encode()).hexdigest();now=self.clock();day=int(now//86400)
@@ -122,20 +124,24 @@ class ContextualAdvisor:
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             if old and old[0]>now:
                 checkpoint()
-                return json.loads(old[2]) if old[1]=='complete' else {**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy'}
+                if old[1]=='complete':cached=json.loads(old[2])
+                else:
+                    cached={**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy'}
+                    if old[2] and json.loads(old[2]).get('diagnostic'):cached['diagnostic']=json.loads(old[2])['diagnostic']
+                return render_language(cached,language)
             interval=getattr(self.provider,'minimum_interval',0)
             latest=db.execute('SELECT MAX(started) FROM advisor_requests').fetchone()[0]
             if interval and latest is not None and now-latest<interval:
-                return {**fallback,'status':'rate-limit'}
+                return render_language({**fallback,'status':'rate-limit'},language)
             if db.execute("SELECT 1 FROM advisor_requests WHERE state='pending' AND expires>? LIMIT 1",(now,)).fetchone():
-                return {**fallback,'status':'busy'}
+                return render_language({**fallback,'status':'busy'},language)
             if db.execute('SELECT count(*) FROM advisor_requests WHERE day=?',(day,)).fetchone()[0]>=self.daily_calls:
-                return {**fallback,'status':'daily-limit'}
+                return render_language({**fallback,'status':'daily-limit'},language)
             # Preserve spent reservations on expired identical requests by a separate usage ledger.
             db.execute('CREATE TABLE IF NOT EXISTS advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
             db.execute('INSERT OR IGNORE INTO advisor_budget VALUES (?,0)',(day,))
             if db.execute('UPDATE advisor_budget SET calls=calls+1 WHERE day=? AND calls<?',(day,self.daily_calls)).rowcount!=1:
-                return {**fallback,'status':'daily-limit'}
+                return render_language({**fallback,'status':'daily-limit'},language)
             db.execute('INSERT OR REPLACE INTO advisor_requests VALUES (?,?,?,?,?,?,NULL)',(scope,digest,now,now+30,day,'pending'))
         result=None
         try:
@@ -162,7 +168,7 @@ class ContextualAdvisor:
             if result is not None:
                 with self.db() as db:db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',
                     ('complete' if result['status']=='model-assisted' else 'failed',now+(3600 if result['status']=='model-assisted' else 600),json.dumps(result),scope,digest,now))
-        return result
+        return render_language(result,language)
 
 
 def configured_advisor():

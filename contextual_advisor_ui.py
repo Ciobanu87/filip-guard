@@ -3,8 +3,9 @@ def render_advice(ui,result):
     ui.caption('Analysis status: '+result['status']+'. All recommendations require human review; ranking outcomes are not guaranteed.')
     if result['status'] not in ('rules','model-assisted'):
         ui.info('Model analysis was unavailable, blocked or invalid. Existing deterministic recommendations remain available.')
+    if result.get('diagnostic'):ui.caption('Diagnostic: '+str(result['diagnostic']))
     items=result['recommendations']
-    ui.dataframe([{k:v for k,v in item.items() if k in ('page','problem','solution','reason','priority','priority_reason','risk','source','model','seo_draft','repair_supported','approval')} for item in items],hide_index=True)
+    ui.dataframe([{k:v for k,v in item.items() if k in ('page','problem','solution','reason','priority','priority_reason','risk','source','model','seo_draft','repair_supported','approval','problem_label','cause','impact','language')} for item in items],hide_index=True)
     for index,item in enumerate(items):
         with ui.expander(item['problem']+' · '+item['page']):
             ui.write('Source: '+item['source']+(' · '+item['model'] if item['model'] else ''))

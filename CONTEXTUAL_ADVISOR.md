@@ -1,4 +1,9 @@
-# Contextual Advisor — implemented integration, real inference not validated
+# Contextual Advisor — implemented integration, real quality not validated
+
+Current status: the owner obtained three real provider responses but no accepted
+advice in the first Colab run. See [AI_REPAIR_VALIDATION.md](AI_REPAIR_VALIDATION.md)
+for the diagnosed boundary and prepared retest. Earlier preparation statements
+below are historical; they do not supersede this owner-run evidence.
 
 Update: a separate opt-in Groq Free cloud adapter and phone-accessible Colab
 validation path are now prepared. See [CLOUD_AI_VALIDATION.md](CLOUD_AI_VALIDATION.md).

@@ -1,4 +1,9 @@
-# Cloud AI validation — owner key still required, no real inference yet
+# Cloud AI validation — first owner responses received; quality still pending
+
+Update: the owner completed the first real run (three provider responses, zero
+accepted selections). See [AI_REPAIR_VALIDATION.md](AI_REPAIR_VALIDATION.md) for the
+evidence, corrections and updated notebook. Prior setup details below remain
+applicable; the original no-inference statements describe preparation only.
 
 This extends the existing provider protocol and preserves Ollama, Scanner rules,
 evidence validation, the explicit customer AI button, and all WordPress approval/
