@@ -3,7 +3,7 @@ STAGES={'connect','send','read','http','json','provider','selection','deadline',
 CODES={'timeout','connection_failed','tls_failed','dns_failed','network_failed','invalid_http','http_error',
        'invalid_json','response_rejected','key_unavailable','input_bound','schema_shape','finding_count',
        'selection_fields','finding_identity','evidence_binding','focus_priority','priority_downgrade',
-       'evidence_missing','draft_unsupported','contract_mismatch','model_identity','completion_incomplete','unsafe_message','usage_rejected','ok','unknown'}
+       'evidence_missing','draft_unsupported','contract_mismatch','model_identity','completion_incomplete','unsafe_message','usage_rejected','context_contradiction','ok','unknown'}
 from advisor_provider import ProviderUnavailable
 
 class AdvisorFailure(ValueError,ProviderUnavailable):

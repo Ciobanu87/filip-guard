@@ -27,7 +27,7 @@ class RealFailureRegressionTests(unittest.TestCase):
         fields=root['properties']['f0']['properties']
         self.assertEqual(set(fields),{'evidence_id','priority','missing_information','include_draft'})
         self.assertEqual(fields['priority']['enum'],['Medium','High'])
-        self.assertEqual(fields['evidence_id']['enum'],list(facts))
+        self.assertEqual(fields['evidence_id']['enum'],['p0e1'])
     def test_no_guard_is_removed_for_malicious_indexed_output(self):
         bundle,facts,base=evidence_bundle(ROWS,CONTEXT)
         for change in [{'evidence_id':'p99e0'},{'command':'danger'},{'include_draft':'true'}]:

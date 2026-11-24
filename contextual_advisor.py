@@ -75,6 +75,8 @@ def validate_selection(payload,bundle,facts,base,model):
             raise AdvisorFailure('focus_priority')
         order={'Low':0,'Medium':1,'High':2}
         if order[selected['priority']]<order[item['priority']]:raise AdvisorFailure('priority_downgrade')
+        from advisor_quality import has_page_content
+        if has_page_content(item,facts) and 'content_unavailable' in missing:raise AdvisorFailure('context_contradiction')
         evidence=[facts[k] for k in ids]
         if not evidence and 'content_unavailable' not in missing:raise AdvisorFailure('evidence_missing')
         if draft is not None:
@@ -160,7 +162,7 @@ class ContextualAdvisor:
         try:
             checkpoint()
             schema=SCHEMA;system=SYSTEM
-            indexed=getattr(self.provider,'selection_contract','')=='indexed-evidence-v2'
+            indexed=getattr(self.provider,'selection_contract','')in ('indexed-evidence-v2','indexed-evidence-v3')
             if indexed:
                 from advisor_selection_contract import build_schema,SYSTEM as indexed_system
                 schema=build_schema(base,facts,MISSING);system=indexed_system

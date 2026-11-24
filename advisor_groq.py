@@ -100,7 +100,7 @@ def build_payload(messages,schema,*,model=MODEL,max_output_tokens=1200):
 
 class GroqFreeProvider:
     name='groq-free'
-    selection_contract='indexed-evidence-v2'
+    selection_contract='indexed-evidence-v3'
     minimum_interval=61
     def __init__(self,key_provider,*,model=MODEL,free_plan_confirmed=False,data_consent=False):
         if model!=MODEL or not callable(key_provider):raise ValueError('Reviewed cloud model and explicit key provider required')

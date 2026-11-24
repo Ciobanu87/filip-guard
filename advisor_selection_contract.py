@@ -4,11 +4,12 @@ Cloud constrained decoding gets the exact IDs, priority floor and available
 choices for each finding. No free-form draft, guessed focus or invented ID.
 """
 from advisor_diagnostics import AdvisorFailure
-VERSION='indexed-evidence-v2'
+from advisor_quality import eligible_evidence,has_page_content
+VERSION='indexed-evidence-v3'
 
 
 def choices_for(item,facts):
-    return [key for key in facts if key.startswith(item['page_id']+'e')]
+    return eligible_evidence(item,facts)
 
 
 def build_schema(base,facts,missing):
@@ -18,7 +19,7 @@ def build_schema(base,facts,missing):
         priorities=['Medium','High'] if item['priority']=='Medium' else ['High'] if item['priority']=='High' else ['Low','Medium','High']
         fields={'evidence_id':{'type':'string','enum':ids} if ids else {'type':'null'},
             'priority':{'type':'string','enum':priorities},
-            'missing_information':{'type':'array','items':{'type':'string','enum':sorted(missing)}},
+            'missing_information':{'type':'array','items':{'type':'string','enum':sorted(set(missing)-({'content_unavailable'} if has_page_content(item,facts) else set()))}},
             'include_draft':{'type':'boolean'} if item['problem'] in ('Missing SEO title','Missing meta description') else {'type':'boolean','enum':[False]}}
         properties[item['finding_id']]={'type':'object','additionalProperties':False,'required':list(fields),'properties':fields}
     return {'type':'object','additionalProperties':False,'required':['recommendations'],'properties':{
@@ -41,6 +42,7 @@ def normalize(payload,base,facts,focuses):
         missing=choice['missing_information']
         if type(missing) is not list:raise AdvisorFailure('selection_fields')
         missing=list(missing)
+        if has_page_content(item,facts) and 'content_unavailable' in missing:raise AdvisorFailure('context_contradiction')
         if identifier is None and 'content_unavailable' not in missing:missing.append('content_unavailable')
         fact=facts.get(identifier);draft=None
         if (choice['include_draft'] and fact and item['problem'] in ('Missing SEO title','Missing meta description')
