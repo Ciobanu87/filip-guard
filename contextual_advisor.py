@@ -22,6 +22,7 @@ FOCUS={'Missing SEO title':'discoverability','Missing meta description':'discove
        'H1 structure needs review':'structure','Images missing ALT text':'accessibility',
        'Page unavailable or scan failed':'availability'}
 MISSING={'business_goal_unknown','audience_unknown','image_purpose_unknown','content_unavailable'}
+SELECTION_REVISION='bounded-uncertainty-v1'
 FIELDS={'finding_id','evidence_ids','priority','focus','missing_information','seo_draft'}
 SCHEMA={'type':'object','additionalProperties':False,'required':['recommendations'],'properties':{
  'recommendations':{'type':'array','maxItems':8,'items':{'type':'object','additionalProperties':False,
@@ -71,7 +72,8 @@ def validate_selection(payload,bundle,facts,base,model):
         if (type(ids) is not list or len(ids)>3 or any(type(k) is not str or k not in facts or not k.startswith(item['page_id']+'e') for k in ids)
                 or len(set(ids))!=len(ids) or type(missing) is not list or len(missing)>4
                 or any(type(x) is not str or x not in MISSING for x in missing)):
-            raise AdvisorFailure('evidence_binding')
+            reason='missing_information_size' if type(missing) is list and len(missing)>4 else 'missing_information_value' if type(missing) is list and any(type(x) is not str or x not in MISSING for x in missing) else 'evidence_scope_or_duplicates'
+            raise AdvisorFailure('evidence_binding',binding_reason=reason)
         if selected['focus']!=FOCUS[item['problem']] or selected['priority'] not in ('High','Medium','Low'):
             raise AdvisorFailure('focus_priority')
         order={'Low':0,'Medium':1,'High':2}
@@ -139,7 +141,10 @@ class ContextualAdvisor:
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             old_quota=bool(old and old[2] and advisor_quota.is_quota(json.loads(old[2]).get('diagnostic')))
             old_key_error=bool(old and old[2] and is_credential_failure(json.loads(old[2]).get('diagnostic')))
-            if old and old[0]>now and not old_quota and not old_key_error and old[1] not in ('transient','readiness-failure'):
+            old_binding=bool(old and old[1]=='failed' and old[2] and
+                json.loads(old[2]).get('diagnostic',{}).get('code')=='evidence_binding' and
+                json.loads(old[2]).get('selection_revision')!=SELECTION_REVISION)
+            if old and old[0]>now and not old_binding and not old_quota and not old_key_error and old[1] not in ('transient','readiness-failure'):
                 checkpoint()
                 if old[1]=='complete':cached=json.loads(old[2])
                 else:
@@ -190,6 +195,7 @@ class ContextualAdvisor:
         finally:
             if result is not None:
                 with self.db() as db:
+                    result['selection_revision']=SELECTION_REVISION
                     limited=advisor_quota.is_quota(result.get('diagnostic'))
                     key_failure=is_credential_failure(result.get('diagnostic'))
                     if key_failure:result={**result,'status':'credential-unavailable','cache_origin':'credential-readiness'}

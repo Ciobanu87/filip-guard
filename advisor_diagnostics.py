@@ -7,8 +7,10 @@ CODES={'timeout','connection_failed','tls_failed','dns_failed','network_failed',
 from advisor_provider import ProviderUnavailable
 
 class AdvisorFailure(ValueError,ProviderUnavailable):
-    def __init__(self,code,stage='selection',*,http_status=None,retry_after=None,provider_code=None,provider_type=None,quota=None):
+    def __init__(self,code,stage='selection',*,http_status=None,retry_after=None,provider_code=None,provider_type=None,quota=None,binding_reason=None):
         self.diagnostic={'stage':stage if stage in STAGES else 'unknown','code':code if code in CODES else 'unknown'}
+        if type(binding_reason) is str and binding_reason in {'evidence_identifier','draft_flag','missing_information_type','missing_information_size','missing_information_value','evidence_scope_or_duplicates'}:
+            self.diagnostic['binding_reason']=binding_reason
         if type(http_status) is int and 100<=http_status<=599:self.diagnostic['http_status']=http_status
         if type(retry_after) in (int,float) and 0<=retry_after<=31*86400:self.diagnostic['retry_after_seconds']=retry_after
         provider_codes={'json_validate_failed','invalid_api_key','rate_limit_exceeded','model_not_found','context_length_exceeded','invalid_json_schema','invalid_request_error'}

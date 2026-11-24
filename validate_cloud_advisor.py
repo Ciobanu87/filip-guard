@@ -41,6 +41,7 @@ def run_validation(advisor,*,live=False,wait=time.sleep,progress=None,max_cases=
                    meta_description='',h1_count=1,images_missing_alt=0)]
         rows[0].update(spec.get('row_overrides',{}))
         contexts={url:spec['contexts']} if 'contexts' in spec else {} if text is None else {url:[text]}
+        observed_texts=contexts.get(url,[])
         old=rule_result(rows,contexts)['recommendations'][0]
         before=getattr(provider,'successful_exchanges',0);attempts_before=getattr(provider,'attempted_exchanges',0);began=time.monotonic()
         result=previous if previous is not None else advisor.analyze(rows,contexts,scope='f'*32+':'+format(index+1,'032x'),language=language)
@@ -53,8 +54,8 @@ def run_validation(advisor,*,live=False,wait=time.sleep,progress=None,max_cases=
             'cooldown':result.get('cooldown'),
             'latency_seconds':round(time.monotonic()-began,3),
             'diagnosis_matches_scanner':item['problem']==problem,
-            'baseline_page_specific':bool(text and text in old['solution']),
-            'candidate_page_specific':bool(text and text in item['solution']),
+            'baseline_page_specific':any(value in old['solution'] for value in observed_texts if value),
+            'candidate_page_specific':any(value in item['solution'] for value in observed_texts if value),
             'draft_grounded_or_abstained':item['seo_draft'] is None or (text is not None and item['seo_draft'] in text),
             'no_repair_authority':item['autofix'] is False and item['repair_supported'] is False,
             'human_review_required':True,'model':item['model'],

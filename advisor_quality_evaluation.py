@@ -41,7 +41,7 @@ def observable_quality(event,spec):
     content_present=bool(spec.get('contexts') or spec.get('text'))
     uncertainty_consistent=not (content_present and 'content_unavailable' in sample['missing_information'])
     accepted=event.get('selection_validated',False)
-    checks={'selection_accepted':accepted,'fixture_relevant_evidence_selected':expected_selected,
+    checks={'selection_accepted':accepted,'fixture_relevant_evidence_selected':accepted and expected_selected,
         'uncertainty_consistent_with_input':uncertainty_consistent,
         'draft_grounded_or_abstained':event['draft_grounded_or_abstained'],
         'required_abstention_respected':not spec['expect_abstention'] or sample['draft'] is None,
