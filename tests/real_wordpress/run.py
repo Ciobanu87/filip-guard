@@ -325,6 +325,81 @@ class RealWordPressTests(unittest.TestCase):
             proposed_content='<p>Updated</p>',**self.session)['plan_id']
         return plan,self.engine.approve(plan,confirmed=True,**self.session)
 
+    def test_real_streamlit_user_journey_scan_repair_restore_and_monitor(self):
+        from streamlit.testing.v1 import AppTest
+        from customer_auth import CustomerAuth
+        from customer_sites import CustomerSites
+        from guard_application import GuardApplication
+        from monitoring_service import MonitoringService
+        from monitoring_scan import SecureMonitoringScan
+        from test_verified_external_backups import MemoryStore
+        root=Path(self.temp.name)
+        destination=int(self.fixture.wpcli('post','create','--post_type=page','--post_status=publish',
+            '--post_title=Verified destination','--post_name=verified-destination','--post_content=<h1>Destination</h1>','--porcelain'))
+        replacement=self.fixture.wpcli('eval',f'echo get_permalink({destination});')
+        missing=self.fixture.site_url+'/missing-ui-destination/'
+        original='<h1>Source</h1><a href="'+missing+'">Destination</a>'
+        source=int(self.fixture.wpcli('post','create','--post_type=post','--post_status=publish',
+            '--post_title=UI source','--post_content='+original,'--porcelain'))
+        source_url=self.fixture.wpcli('eval',f'echo get_permalink({source});')
+        master=secrets.token_bytes(32)
+        auth=CustomerAuth(root/'ui-accounts.sqlite')
+        store=MemoryStore()  # Explicitly simulated external provider; AES-GCM archive is real.
+        sites=CustomerSites(auth,root/'ui-sites',lambda _:master,active_key_id='ui-test',
+            object_store=store,gateway_factory=WordPressRESTGateway)
+        scanner=SecureMonitoringScan(min_gap=0.05,max_seconds=30)
+        monitor=MonitoringService(sites,root/'ui-monitor.sqlite',scanner=scanner)
+        app=GuardApplication(sites,monitor,authorized_test_origins=[self.fixture.site_url],
+            scanner=scanner,simulated_storage=True,allow_registration=True)
+        with patch('guard_application_ui.configured_guard_application',return_value=app):
+            at=AppTest.from_file(str(ROOT/'app.py'),default_timeout=90).run()
+            def run():
+                at.run();self.assertEqual(list(at.exception),[])
+                self.assertFalse(list(at.error),[x.value for x in at.error])
+            def text(label,value):next(x for x in at.text_input if x.label==label).set_value(value)
+            def click(label):next(x for x in at.button if x.label==label).click();run()
+            next(x for x in at.checkbox if x.label=='Create an account').check();run()
+            text('Account username','ui-customer');text('Account password','Generated-test-account-password')
+            click('Create account')
+            text('WordPress username','fg-admin');text('WordPress Application Password',self.fixture.admin_password)
+            click('Authorize site')
+            session=at.session_state['fg_customer_session'];site=sites.list_sites(session)[0]['site_id']
+            next(x for x in at.selectbox if x.label=='Page to scan').set_value(source_url)
+            next(x for x in at.number_input if x.label=='Maximum pages for this scan').set_value(1)
+            click('Scan authorized site')
+            self.assertTrue(app.proposals(session,site,app.scan_record(session,site)['scan_id']))
+            next(x for x in at.selectbox if x.label=='Replacement page').set_value(replacement)
+            click('Prepare exact repair proposal')
+            self.assertTrue(next(x for x in at.button if x.label=='Approve and apply test change').disabled)
+            next(x for x in at.checkbox if x.label=='I approve exactly this change').check();run()
+            click('Approve and apply test change')
+            history=app.history(session,site);repair=next(x for x in history if x['kind']=='repair')
+            self.assertEqual(repair['repair']['result']['status'],'applied')
+            self.assertTrue(store.objects)
+            click('Recheck changed page')
+            self.assertNotIn(missing,[x['url'] for x in app.scan_record(session,site)['report']['broken']])
+            click('Review rollback')
+            next(x for x in at.checkbox if x.label=='I approve exactly this change').check();run()
+            click('Approve and apply test change')
+            actual=self.fixture.wpcli('post','get',str(source),'--field=post_content')
+            self.assertEqual(actual,original)
+            next(x for x in at.checkbox if x.label=='Enable periodic monitoring').check()
+            next(x for x in at.number_input if x.label=='Maximum pages per check').set_value(1)
+            click('Save monitoring settings')
+            result=monitor.run_once();self.assertEqual(result['status'],'complete');run()
+            self.assertFalse(result['repairs_authorized']);self.assertTrue(monitor.history(session,site))
+            self.assertTrue(monitor.notifications(session))
+            click('Sign out')
+            next(x for x in at.checkbox if x.label=='Create an account').uncheck();run()
+            text('Account username','ui-customer');text('Account password','Generated-test-account-password');click('Sign in')
+            self.assertEqual(len(app.history(at.session_state['fg_customer_session'],site)),2)
+            if os.environ.get('FG_UI_PROOF_PATH'):
+                Path(os.environ['FG_UI_PROOF_PATH']).write_text(json.dumps({
+                    'status':'passed','wordpress':'real','database':'real MySQL',
+                    'entrypoint':'app.py','journey':['register','authorize','scan','advisor','diff','explicit approval',
+                        'encrypted verified backup','REST write','verify','explicit rollback','monitor','notifications','new login'],
+                    'external_object_store':'simulated','email':'not sent','production':'disabled'},indent=2))
+
     def test_real_auth_and_permissions(self):
         self.assertEqual(self.snapshot().content,'<p>Original</p>')
         with self.assertRaises(WordPressRESTAuthenticationError):

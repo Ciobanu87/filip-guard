@@ -84,4 +84,13 @@ jobs:
           FG_WP_DB_USER: root
           FG_WP_DB_PASSWORD: fg-disposable-ci-only
           FG_WP_DB_PORT: '3306'
+          FG_UI_PROOF_PATH: ${{ runner.temp }}/filip-guard-ui-proof.json
         run: python tests/real_wordpress/run.py
+
+      - name: Preserve sanitized integrated UI demonstration
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: filip-guard-integrated-ui-proof
+          path: ${{ runner.temp }}/filip-guard-ui-proof.json
+          if-no-files-found: ignore
