@@ -1,5 +1,11 @@
 # Cloud AI validation — first owner responses received; quality still pending
 
+Latest status: the owner obtained one accepted real response (232 tokens, 1.258s).
+Its context selection was weak and its missing-content claim contradictory.
+See [AI_QUALITY_CONTINUATION.md](AI_QUALITY_CONTINUATION.md) for the corrected
+quality gates and current nine-case continuation. The completed connection probe
+is not repeated; quota controls below remain in force.
+
 Update: the owner completed the first real run (three provider responses, zero
 accepted selections). See [AI_REPAIR_VALIDATION.md](AI_REPAIR_VALIDATION.md) for the
 evidence, corrections and updated notebook. Prior setup details below remain

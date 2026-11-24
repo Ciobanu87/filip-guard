@@ -1,5 +1,11 @@
 # Groq 429 recovery and one-call validation
 
+Latest status: the owner obtained one accepted real response (232 tokens, 1.258s).
+Its context selection was weak and its missing-content claim contradictory.
+See [AI_QUALITY_CONTINUATION.md](AI_QUALITY_CONTINUATION.md) for the corrected
+quality gates and current nine-case continuation. The completed connection probe
+is not repeated; quota controls below remain in force.
+
 ## Demonstrated cause
 
 The owner's report for `2b30a3fa35664de55930b20ff6649363cba646b1` contains a

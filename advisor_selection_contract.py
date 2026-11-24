@@ -43,7 +43,7 @@ def normalize(payload,base,facts,focuses):
         if type(missing) is not list:raise AdvisorFailure('selection_fields')
         missing=list(missing)
         if has_page_content(item,facts) and 'content_unavailable' in missing:raise AdvisorFailure('context_contradiction')
-        if identifier is None and 'content_unavailable' not in missing:missing.append('content_unavailable')
+        if not has_page_content(item,facts) and 'content_unavailable' not in missing:missing.append('content_unavailable')
         fact=facts.get(identifier);draft=None
         if (choice['include_draft'] and fact and item['problem'] in ('Missing SEO title','Missing meta description')
                 and fact['kind'] in ('title','content') and 20<=len(fact['text'])<=160 and '[redacted]' not in fact['text']):

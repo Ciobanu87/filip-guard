@@ -1,5 +1,11 @@
 # Contextual Advisor — implemented integration, real quality not validated
 
+Latest status: the owner obtained one accepted real response (232 tokens, 1.258s).
+Its context selection was weak and its missing-content claim contradictory.
+See [AI_QUALITY_CONTINUATION.md](AI_QUALITY_CONTINUATION.md) for the corrected
+quality gates and current nine-case continuation. The completed connection probe
+is not repeated; quota controls below remain in force.
+
 Current status: the owner obtained three real provider responses but no accepted
 advice in the first Colab run. See [AI_REPAIR_VALIDATION.md](AI_REPAIR_VALIDATION.md)
 for the diagnosed boundary and prepared retest. Earlier preparation statements
