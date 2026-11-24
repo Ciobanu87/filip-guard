@@ -44,7 +44,7 @@ class RealFailureRegressionTests(unittest.TestCase):
         raw=b'HTTP/1.1 429 Limited\r\nContent-Type: application/json\r\nRetry-After: 120\r\nContent-Length: '+str(len(body)).encode()+b'\r\n\r\n'+body
         socket=Mock();socket.recv.side_effect=[raw]
         with patch('advisor_groq.create_verified_connection',return_value=socket),self.assertRaises(AdvisorFailure) as caught:cloud_exchange(b'{}',KEY,2)
-        self.assertEqual(caught.exception.diagnostic,{'stage':'http','code':'http_error','http_status':429,'retry_after_seconds':120.0})
+        self.assertEqual(caught.exception.diagnostic,{'stage':'http','code':'http_error','http_status':429,'retry_after_seconds':120.0,'quota_kind':'unknown'})
         self.assertNotIn(KEY,str(caught.exception))
     def test_connection_and_read_timeouts_are_distinguishable(self):
         with patch('advisor_groq.create_verified_connection',side_effect=TimeoutError(KEY)),self.assertRaises(AdvisorFailure) as caught:cloud_exchange(b'{}',KEY,2)

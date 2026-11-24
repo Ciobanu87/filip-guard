@@ -15,6 +15,7 @@ from customer_auth import private_database
 from advisor_context import evidence_bundle,VERSION,clean
 from advisor_provider import OllamaProvider
 from advisor_diagnostics import AdvisorFailure,safe_diagnostic
+import advisor_quota
 
 FOCUS={'Missing SEO title':'discoverability','Missing meta description':'discoverability',
        'H1 structure needs review':'structure','Images missing ALT text':'accessibility',
@@ -99,7 +100,9 @@ class ContextualAdvisor:
             raise ValueError('Bounded inference configuration required')
         self.path=private_database(database);self.provider=provider
         self.daily_calls,self.timeout,self.tokens,self.clock=daily_calls,timeout,max_output_tokens,clock
-        with self.db() as db:db.execute('''CREATE TABLE IF NOT EXISTS advisor_requests (
+        with self.db() as db:
+            advisor_quota.install(db)
+            db.execute('''CREATE TABLE IF NOT EXISTS advisor_requests (
             scope TEXT NOT NULL,request_hash TEXT NOT NULL,started REAL NOT NULL,expires REAL NOT NULL,
             day INTEGER NOT NULL,state TEXT NOT NULL,result TEXT,PRIMARY KEY(scope,request_hash))''')
     @contextmanager
@@ -121,12 +124,19 @@ class ContextualAdvisor:
         digest=hashlib.sha256(fingerprint.encode()).hexdigest();now=self.clock();day=int(now//86400)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            provider_key=self.provider.name+':'+self.provider.model
+            if self.provider.name=='groq-free':
+                advisor_quota.migrate_legacy(db,provider_key)
+                cooldown=advisor_quota.active(db,provider_key,now)
+                if cooldown:
+                    return render_language({**fallback,'status':'provider-cooldown','cooldown':cooldown,'diagnostic':cooldown['diagnostic'],'cache_origin':'provider-backoff'},language)
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
-            if old and old[0]>now:
+            old_quota=bool(old and old[2] and advisor_quota.is_quota(json.loads(old[2]).get('diagnostic')))
+            if old and old[0]>now and not old_quota and old[1]!='transient':
                 checkpoint()
                 if old[1]=='complete':cached=json.loads(old[2])
                 else:
-                    cached={**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy'}
+                    cached={**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy','cache_origin':'persistent-validation-failure' if old[1]=='failed' else 'in-flight'}
                     if old[2] and json.loads(old[2]).get('diagnostic'):cached['diagnostic']=json.loads(old[2])['diagnostic']
                 return render_language(cached,language)
             interval=getattr(self.provider,'minimum_interval',0)
@@ -151,7 +161,7 @@ class ContextualAdvisor:
             if indexed:
                 from advisor_selection_contract import build_schema,SYSTEM as indexed_system
                 schema=build_schema(base,facts,MISSING);system=indexed_system
-            messages=[{'role':'system','content':system},{'role':'user','content':json.dumps(bundle,ensure_ascii=False)}]
+            messages=[{'role':'system','content':system},{'role':'user','content':json.dumps(bundle,ensure_ascii=False,separators=(',',':'))}]
             began=time.monotonic()
             payload=self.provider.generate(messages,schema,timeout=self.timeout,max_output_tokens=self.tokens)
             if time.monotonic()-began>self.timeout:raise AdvisorFailure('timeout','deadline')
@@ -166,8 +176,15 @@ class ContextualAdvisor:
         except Exception as error:result={**fallback,'status':'model-unavailable-or-invalid','diagnostic':safe_diagnostic(error)}
         finally:
             if result is not None:
-                with self.db() as db:db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',
-                    ('complete' if result['status']=='model-assisted' else 'failed',now+(3600 if result['status']=='model-assisted' else 600),json.dumps(result),scope,digest,now))
+                with self.db() as db:
+                    limited=advisor_quota.is_quota(result.get('diagnostic'))
+                    if limited:
+                        advisor_quota.record(db,provider_key,self.clock(),result['diagnostic'])
+                        cooldown=advisor_quota.active(db,provider_key,self.clock())
+                        result={**result,'status':'provider-cooldown','cooldown':cooldown,'cache_origin':'fresh-provider-limit'}
+                    db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',
+                        ('transient' if limited else 'complete' if result['status']=='model-assisted' else 'failed',
+                         now+(3600 if result['status']=='model-assisted' else 600),json.dumps(result),scope,digest,now))
         return render_language(result,language)
 
 
