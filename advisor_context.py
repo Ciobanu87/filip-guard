@@ -10,7 +10,7 @@ SENSITIVE=re.compile(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:\d[ -]?){9,}\b|\b(?:s
 
 def clean(value,limit=400):
     if not isinstance(value,str):return ''
-    text=' '.join(value.split())
+    text=' '.join(value[:4096].split())
     text=''.join(c for c in text if c.isprintable())
     if INJECTION.search(text):return ''
     return SENSITIVE.sub('[redacted]',text)[:limit]
@@ -27,6 +27,8 @@ def extract_context(html):
     soup=BeautifulSoup(html,'html.parser')
     for tag in list(soup.select('script,style,noscript,template,form,input,textarea,select,nav,footer,header,[hidden],[aria-hidden="true"]')):
         if tag.parent is not None:tag.decompose()
+    for tag in list(soup.select('[style]')):
+        if tag.parent is not None and re.search(r'display\s*:\s*none|visibility\s*:\s*hidden',str(tag.get('style','')),re.I):tag.decompose()
     fragments=[]
     for tag in soup.select('h1,h2,p')[:30]:
         if re.search(r'display\s*:\s*none|visibility\s*:\s*hidden',str(tag.get('style','')),re.I):continue
@@ -41,9 +43,11 @@ def evidence_bundle(rows,contexts=None,broken=()):
     pages=[];findings=[];facts={};base=[];contexts=contexts or {}
     for index,row in enumerate(rows[:30]):
         page_id='p'+str(index)
-        metrics={k:row.get(k) for k in ('http_status','h1_count','images_missing_alt') if type(row.get(k)) in (int,str)}
-        # Scanner errors may contain sensitive text; only status, not exception text.
-        if type(metrics.get('http_status')) is not int:metrics['http_status']='unavailable'
+        status=row.get('http_status')
+        metrics={'http_status':status if type(status) is int and 100<=status<=599 else 'unavailable'}
+        for key in ('h1_count','images_missing_alt'):
+            value=row.get(key)
+            metrics[key]=value if type(value) is int and 0<=value<=100000 else 'unknown'
         snippets=[]
         for kind,value in [('title',row.get('title','')),('meta_description',row.get('meta_description',''))]+[('content',x) for x in contexts.get(row.get('page'),[])[:5]]:
             value=clean(value,240)

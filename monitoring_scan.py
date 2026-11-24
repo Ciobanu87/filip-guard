@@ -56,13 +56,14 @@ class MonitoringReport:
     complete: bool
     requests: int
     discovered_links: tuple = ()
+    page_context: tuple = ()
 
 
 def _text(value,limit=1000):
     return ''.join(c for c in str(value) if ord(c)>=32 and ord(c)!=127)[:limit]
 
 
-def make_report(rows,broken,checked_links,requests_count,complete=True,link_sources=None):
+def make_report(rows,broken,checked_links,requests_count,complete=True,link_sources=None,page_context=None):
     safe_rows=[];scope=set()
     for row in rows:
         item={key:_text(value,2048 if key=='page' else 1000) if isinstance(value,str) else value for key,value in row.items()}
@@ -96,7 +97,7 @@ def make_report(rows,broken,checked_links,requests_count,complete=True,link_sour
             priority='High',autofix=False,sources=sorted((link_sources or {}).get(link,()))))
     scope.update(('link',url) for url in checked_links)
     return MonitoringReport(tuple(safe_rows),tuple(safe_broken),tuple(recommendations),tuple(findings),
-                            tuple(sorted(scope)),bool(complete),requests_count,tuple(sorted(link_sources or {})))
+                            tuple(sorted(scope)),bool(complete),requests_count,tuple(sorted(link_sources or {})),tuple((page,tuple(text)) for page,text in (page_context or {}).items()))
 
 
 class SecureMonitoringScan:
@@ -111,7 +112,7 @@ class SecureMonitoringScan:
         if 'https://'+hostname!=origin:raise ValueError('Canonical authorized site origin required')
         start=start_url or origin
         target_url(start,hostname)
-        began=time.monotonic();last=None;count=0;cache={};links=set();limited=False;discovered={}
+        began=time.monotonic();last=None;count=0;cache={};links=set();limited=False;discovered={};contexts={}
         def fetch(url,host,method='GET'):
             nonlocal count,last,limited
             target,path,canonical=target_url(url,hostname)
@@ -150,6 +151,7 @@ class SecureMonitoringScan:
             if method=='HEAD':links.add(url)
             return result[0],result[1],'' if method=='HEAD' else result[2]
         rows,broken,_,_=scan(start,page_limit,fetcher=fetch,initial_validator=lambda url:target_url(url),
-                            max_links=min(10,max_requests-page_limit),max_discovered=200,link_observer=lambda link,source:discovered.setdefault(link,set()).add(source))
+                            max_links=min(10,max_requests-page_limit),max_discovered=200,link_observer=lambda link,source:discovered.setdefault(link,set()).add(source),
+                            context_observer=lambda page,text:contexts.update({page:text}))
         checkpoint()
-        return make_report(rows,broken,links,count,not limited,discovered)
+        return make_report(rows,broken,links,count,not limited,discovered,contexts)

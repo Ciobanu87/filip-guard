@@ -1,4 +1,4 @@
-"""Deterministic SEO recommendations. No AI model or external AI API is used."""
+"""Deterministic findings and safe fallback. Optional context lives in contextual_advisor."""
 
 def analyze_pages(rows):
     recommendations = []
@@ -75,7 +75,5 @@ def suggest_meta_description(title):
     if not title:
         return "Add a clear page title first."
 
-    return (
-        f"Discover {title}. Learn more about "
-        "our services, benefits, and solutions."
-    )
+    # A title alone does not establish services, benefits, location or business claims.
+    return f'Review a description based on the observed page topic: {title}.'
