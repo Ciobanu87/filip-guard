@@ -114,6 +114,26 @@ class CustomerSites:
             raise PermissionError('Stored WordPress credentials could not be authenticated') from None
         return data['username'],data['application_password']
 
+    def rotate_credentials(self,session,site_id,*,now=None):
+        """Re-encrypt this owner's credentials under the configured active version.
+
+        No WordPress request or archive deletion. Keep old keys for old backups.
+        A changed registry/session blocks the conditional update.
+        """
+        principal,row=self._owned(session,site_id,now=now)
+        if row['key_id']==self.key_id:return {'status':'unchanged','key_id':self.key_id}
+        username,password=self._credentials(session,site_id,now=now)
+        key=self._derive(principal.customer_id,site_id,self.key_id,'credentials')
+        plaintext=json.dumps(dict(username=username,application_password=password),separators=(',',':')).encode()
+        nonce=secrets.token_bytes(12)
+        encrypted=nonce+AESGCM(key).encrypt(nonce,plaintext,self._aad(principal.customer_id,site_id,row['origin'],row['wordpress_user_id']))
+        self._owned(session,site_id,now=now)
+        with self.db() as db:
+            changed=db.execute('UPDATE customer_sites SET key_id=?,credentials=? WHERE site_id=? AND customer_id=? AND key_id=? AND credentials=?',
+                (self.key_id,encrypted,site_id,principal.customer_id,row['key_id'],row['credentials']))
+            if changed.rowcount!=1:raise PermissionError('Site credentials changed during key rotation')
+        return {'status':'rotated','key_id':self.key_id}
+
     def _workspace(self,principal,site_id):
         # Both components are server-issued opaque hex IDs, never URLs or request paths.
         path=self.root/'customers'/principal.customer_id/'sites'/site_id
