@@ -6,7 +6,7 @@ from unittest.mock import patch
 from advisor_groq import GroqFreeProvider
 from contextual_advisor import ContextualAdvisor
 from validate_cloud_advisor import run_validation
-from test_advisor_groq import KEY,response
+from test_advisor_groq import KEY,response,indexed_selection
 from test_contextual_advisor import selection,SimulatedProvider
 
 class CloudEvaluationTests(unittest.TestCase):
@@ -17,7 +17,7 @@ class CloudEvaluationTests(unittest.TestCase):
             advisor=ContextualAdvisor(Path(root)/'ledger.sqlite',provider,daily_calls=7,clock=lambda:now[0])
             def wait(seconds):self.assertEqual(seconds,61);now[0]+=seconds
             def exchange(body,*args):
-                bundle=json.loads(json.loads(body)['messages'][1]['content']);return response(selection(bundle))
+                bundle=json.loads(json.loads(body)['messages'][1]['content']);return response(indexed_selection(bundle))
             with patch('advisor_groq.cloud_exchange',side_effect=exchange) as transport:
                 report=run_validation(advisor,wait=wait)
             self.assertEqual(transport.call_count,7);self.assertFalse(report['real_inference_executed'])

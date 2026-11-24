@@ -14,6 +14,7 @@ from pathlib import Path
 from customer_auth import private_database
 from advisor_context import evidence_bundle,VERSION,clean
 from advisor_provider import OllamaProvider
+from advisor_diagnostics import AdvisorFailure,safe_diagnostic
 
 FOCUS={'Missing SEO title':'discoverability','Missing meta description':'discoverability',
        'H1 structure needs review':'structure','Images missing ALT text':'accessibility',
@@ -55,31 +56,31 @@ def rule_result(rows,contexts=None,*,status='rules'):
 
 
 def validate_selection(payload,bundle,facts,base,model):
-    if type(payload) is not dict or set(payload)!={'recommendations'}:raise ValueError('Unexpected model response fields')
+    if type(payload) is not dict or set(payload)!={'recommendations'}:raise AdvisorFailure('schema_shape')
     items=payload['recommendations']
-    if type(items) is not list or len(items)!=len(base):raise ValueError('Incomplete model result')
+    if type(items) is not list or len(items)!=len(base):raise AdvisorFailure('finding_count')
     originals={x['finding_id']:x for x in base};seen=set();result=[]
     for selected in items:
-        if type(selected) is not dict or set(selected)!=FIELDS:raise ValueError('Invalid selection fields')
+        if type(selected) is not dict or set(selected)!=FIELDS:raise AdvisorFailure('selection_fields')
         identifier=selected['finding_id']
-        if type(identifier) is not str or identifier not in originals or identifier in seen:raise ValueError('Unsupported or duplicate finding')
+        if type(identifier) is not str or identifier not in originals or identifier in seen:raise AdvisorFailure('finding_identity')
         seen.add(identifier);item=originals[identifier]
         ids=selected['evidence_ids'];missing=selected['missing_information'];draft=selected['seo_draft']
         if (type(ids) is not list or len(ids)>3 or any(type(k) is not str or k not in facts or not k.startswith(item['page_id']+'e') for k in ids)
                 or len(set(ids))!=len(ids) or type(missing) is not list or len(missing)>4
                 or any(type(x) is not str or x not in MISSING for x in missing)):
-            raise ValueError('Unobserved or cross-page evidence')
+            raise AdvisorFailure('evidence_binding')
         if selected['focus']!=FOCUS[item['problem']] or selected['priority'] not in ('High','Medium','Low'):
-            raise ValueError('Invalid interpretation')
+            raise AdvisorFailure('focus_priority')
         order={'Low':0,'Medium':1,'High':2}
-        if order[selected['priority']]<order[item['priority']]:raise ValueError('Model cannot downgrade a detected problem')
+        if order[selected['priority']]<order[item['priority']]:raise AdvisorFailure('priority_downgrade')
         evidence=[facts[k] for k in ids]
-        if not evidence and 'content_unavailable' not in missing:raise ValueError('Missing evidence must be explicit')
+        if not evidence and 'content_unavailable' not in missing:raise AdvisorFailure('evidence_missing')
         if draft is not None:
             if (item['problem'] not in ('Missing SEO title','Missing meta description') or type(draft) is not str
                     or not 20<=len(draft)<=160 or '[redacted]' in draft or clean(draft,160)!=draft
                     or not any(draft in e['text'] and e['kind'] in ('title','content') for e in evidence)):
-                raise ValueError('Unsubstantiated SEO draft')
+                raise AdvisorFailure('draft_unsupported')
         quote=evidence[0]['text'] if evidence else 'No usable public page text was observed.'
         reason=item['reason']+' Observed page evidence: “'+quote+'”'
         solution=item['solution']
@@ -139,15 +140,24 @@ class ContextualAdvisor:
         result=None
         try:
             checkpoint()
-            messages=[{'role':'system','content':SYSTEM},{'role':'user','content':json.dumps(bundle,ensure_ascii=False)}]
+            schema=SCHEMA;system=SYSTEM
+            indexed=getattr(self.provider,'selection_contract','')=='indexed-evidence-v2'
+            if indexed:
+                from advisor_selection_contract import build_schema,SYSTEM as indexed_system
+                schema=build_schema(base,facts,MISSING);system=indexed_system
+            messages=[{'role':'system','content':system},{'role':'user','content':json.dumps(bundle,ensure_ascii=False)}]
             began=time.monotonic()
-            payload=self.provider.generate(messages,SCHEMA,timeout=self.timeout,max_output_tokens=self.tokens)
-            if time.monotonic()-began>self.timeout:raise TimeoutError()
-            checkpoint();selected=validate_selection(payload,bundle,facts,base,self.provider.model)
+            payload=self.provider.generate(messages,schema,timeout=self.timeout,max_output_tokens=self.tokens)
+            if time.monotonic()-began>self.timeout:raise AdvisorFailure('timeout','deadline')
+            checkpoint()
+            if indexed:
+                from advisor_selection_contract import normalize
+                payload=normalize(payload,base,facts,FOCUS)
+            selected=validate_selection(payload,bundle,facts,base,self.provider.model)
             result={**fallback,'status':'model-assisted','recommendations':selected+fallback['recommendations'][len(base):],
                     'response_contract_validated':True,'provider':self.provider.name}
         except PermissionError:raise
-        except Exception:result={**fallback,'status':'model-unavailable-or-invalid'}
+        except Exception as error:result={**fallback,'status':'model-unavailable-or-invalid','diagnostic':safe_diagnostic(error)}
         finally:
             if result is not None:
                 with self.db() as db:db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',

@@ -7,6 +7,9 @@ limits are an additional guard, never a billing guarantee for an upgraded accoun
 import json
 import re
 import time
+import socket
+import ssl
+from advisor_diagnostics import AdvisorFailure
 from advisor_provider import ProviderUnavailable,strict_json
 from wordpress_secure_https import create_verified_connection,parse_http_response
 
@@ -15,34 +18,61 @@ PATH='/openai/v1/chat/completions'
 MODEL='qwen/qwen3.8-27b'
 
 
+def framed_complete(raw):
+    """Stop at a verified CL/chunked message boundary, not a peer idle timeout."""
+    split=raw.find(b'\r\n\r\n')
+    if split<0:return False
+    header=raw[:split].lower();body=raw[split+4:]
+    lengths=re.findall(rb'(?:^|\r\n)content-length:[ \t]*([0-9]+)[ \t]*(?=\r\n|$)',header)
+    if lengths:
+        if len(lengths)!=1 or len(lengths[0])>10:raise ValueError()
+        size=int(lengths[0])
+        if size>65536 or len(body)>size:raise ValueError()
+        if len(body)==size:
+            parse_http_response(bytes(raw));return True
+    elif b'transfer-encoding:' in header and (body==b'0\r\n\r\n' or body.endswith(b'\r\n0\r\n\r\n')):
+        parse_http_response(bytes(raw));return True
+    return False
+
+
 def cloud_exchange(body,key,timeout):
     """Credentials go only to a fixed verified public host; no redirects/retries."""
     if type(body) is not bytes or len(body)>32768 or not 1<=timeout<=20:raise ValueError('Bounded cloud request required')
     if type(key) is not str or not re.fullmatch(r'gsk_[A-Za-z0-9_-]{16,200}',key):raise ValueError('Explicit Groq key required')
-    deadline=time.monotonic()+timeout;connection=None
+    deadline=time.monotonic()+timeout;connection=None;stage='connect';status_hint=None
     try:
         connection=create_verified_connection(HOST,timeout=timeout)
         def remaining():
             duration=deadline-time.monotonic()
             if duration<=0:raise TimeoutError()
             connection.settimeout(duration)
-        remaining()
+        remaining();stage='send'
         head=('POST '+PATH+' HTTP/1.1\r\nHost: '+HOST+'\r\nAuthorization: Bearer '+key+
             '\r\nContent-Type: application/json\r\nAccept: application/json\r\nAccept-Encoding: identity\r\nConnection: close\r\nContent-Length: '+str(len(body))+'\r\n\r\n')
         connection.sendall(head.encode('ascii')+body)
-        raw=bytearray()
+        raw=bytearray();stage='read'
         while True:
             remaining();chunk=connection.recv(min(4096,98305-len(raw)))
             if not chunk:break
             raw.extend(chunk)
             if len(raw)>98304:raise ValueError()
+            hint=re.match(rb'HTTP/1\.[01] ([2-5][0-9]{2}) ',raw)
+            if hint:status_hint=int(hint[1])
+            if framed_complete(raw):break
             if b'\r\n\r\n' not in raw and len(raw)>16384:raise ValueError()
-        response=parse_http_response(bytes(raw))
-        if response.status!=200:raise ValueError()  # 401/403/429/5xx all fail closed, no retries.
+        stage='http';response=parse_http_response(bytes(raw))
+        if response.status!=200:
+            delay=next((v for k,v in response.headers if k=='retry-after'),None)
+            delay=float(delay) if delay and re.fullmatch(r'\d{1,4}(?:\.\d+)?',delay) else None
+            raise AdvisorFailure('http_error','http',http_status=response.status,retry_after=delay)
         types=[v.lower().split(';')[0].strip() for k,v in response.headers if k=='content-type']
         if types!=['application/json'] or len(response.body)>65536:raise ValueError()
-        return strict_json(response.body.decode('utf-8'))
-    except Exception:raise ProviderUnavailable('Cloud inference unavailable or invalid; rules retained') from None
+        stage='json';return strict_json(response.body.decode('utf-8'))
+    except AdvisorFailure:raise
+    except (TimeoutError,socket.timeout):raise AdvisorFailure('timeout',stage) from None
+    except ssl.SSLError:raise AdvisorFailure('tls_failed',stage) from None
+    except OSError:raise AdvisorFailure('network_failed',stage) from None
+    except Exception:raise AdvisorFailure('invalid_json' if stage=='json' else 'invalid_http',stage,http_status=status_hint) from None
     finally:
         key=None
         if connection is not None:connection.close()
@@ -50,23 +80,28 @@ def cloud_exchange(body,key,timeout):
 
 class GroqFreeProvider:
     name='groq-free'
+    selection_contract='indexed-evidence-v2'
     minimum_interval=61
     def __init__(self,key_provider,*,model=MODEL,free_plan_confirmed=False,data_consent=False):
         if model!=MODEL or not callable(key_provider):raise ValueError('Reviewed cloud model and explicit key provider required')
         if free_plan_confirmed is not True or data_consent is not True:
             raise ValueError('Free organization and sanitized-data transfer must be explicitly confirmed')
-        self.model=model;self.keys=key_provider;self.successful_exchanges=0;self.last_usage=None
+        self.model=model;self.keys=key_provider;self.successful_exchanges=0;self.last_usage=None;self.last_diagnostic=None
     def generate(self,messages,schema,*,timeout=15,max_output_tokens=1200):
         if not 1<=timeout<=20 or not 64<=max_output_tokens<=1600:raise ValueError('Bounded inference required')
         # Conservative input-byte bound in addition to the provider's token limits.
         if sum(len(m['content'].encode('utf-8')) for m in messages)+len(json.dumps(schema).encode())>6000:
-            raise ProviderUnavailable('Cloud context exceeds conservative free-test bound')
+            raise AdvisorFailure('input_bound','input')
         # Schema constraints still undergo full independent semantic validation.
         body=json.dumps({'model':self.model,'messages':messages,'stream':False,'temperature':0,
             'reasoning_effort':'none','reasoning_format':'hidden','max_completion_tokens':max_output_tokens,
             'response_format':{'type':'json_schema','json_schema':{'name':'filip_guard_advice','strict':True,'schema':schema}}},ensure_ascii=False).encode()
+        self.last_diagnostic=None
         try:
-            result=cloud_exchange(body,self.keys(),timeout)
+            try:key=self.keys()
+            except Exception:raise AdvisorFailure('key_unavailable','input') from None
+            try:result=cloud_exchange(body,key,timeout)
+            finally:key=None
             if type(result) is not dict or result.get('model')!=self.model:raise ValueError()
             choices=result.get('choices');usage=result.get('usage')
             if type(choices) is not list or len(choices)!=1 or type(choices[0]) is not dict or choices[0].get('finish_reason')!='stop':raise ValueError()
@@ -78,4 +113,7 @@ class GroqFreeProvider:
             payload=strict_json(message['content'])
             self.successful_exchanges+=1;self.last_usage={k:usage[k] for k in ('prompt_tokens','completion_tokens','total_tokens')}
             return payload
-        except Exception:raise ProviderUnavailable('Cloud response rejected; rules retained') from None
+        except AdvisorFailure as error:
+            self.last_diagnostic=error.diagnostic;raise
+        except Exception:
+            error=AdvisorFailure('response_rejected','provider');self.last_diagnostic=error.diagnostic;raise error from None

@@ -20,6 +20,12 @@ def raw_response(status=200,body=None):
     body=json.dumps(body or response()).encode()
     return f'HTTP/1.1 {status} Test\r\nContent-Type: application/json\r\nContent-Length: {len(body)}\r\n\r\n'.encode()+body
 
+def indexed_selection(bundle):
+    legacy=selection(bundle)
+    return {'recommendations':{item['finding_id']:{'evidence_id':item['evidence_ids'][0] if item['evidence_ids'] else None,
+        'priority':item['priority'],'missing_information':item['missing_information'],'include_draft':item['seo_draft'] is not None}
+        for item in legacy['recommendations']}}
+
 class GroqProviderTests(unittest.TestCase):
     def provider(self):return GroqFreeProvider(lambda:KEY,free_plan_confirmed=True,data_consent=True)
     def test_strict_schema_no_tools_no_reasoning_and_bounded_output(self):
@@ -65,7 +71,7 @@ class GroqProviderTests(unittest.TestCase):
             engine=ContextualAdvisor(Path(root)/'ledger.sqlite',self.provider(),daily_calls=1)
             def inference(body,*args):
                 bundle=json.loads(json.loads(body)['messages'][1]['content'])
-                self.assertNotIn('token=private',str(bundle));return response(selection(bundle))
+                self.assertNotIn('token=private',str(bundle));return response(indexed_selection(bundle))
             with patch('advisor_groq.cloud_exchange',side_effect=inference) as exchange:
                 self.assertEqual(engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
                 self.assertEqual(engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
@@ -87,7 +93,7 @@ class GroqProviderTests(unittest.TestCase):
     def test_cloud_minute_limit_survives_reconstruction_and_is_shared_across_scopes(self):
         with tempfile.TemporaryDirectory() as root:
             path=Path(root)/'ledger.sqlite';provider=self.provider()
-            def inference(body,*args):return response(selection(json.loads(json.loads(body)['messages'][1]['content'])))
+            def inference(body,*args):return response(indexed_selection(json.loads(json.loads(body)['messages'][1]['content'])))
             with patch('advisor_groq.cloud_exchange',side_effect=inference) as network:
                 self.assertEqual(ContextualAdvisor(path,provider,clock=lambda:100).analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
                 self.assertEqual(ContextualAdvisor(path,provider,clock=lambda:101).analyze(ROWS,CONTEXT,scope='c'*32+':'+'d'*32)['status'],'rate-limit')
