@@ -60,3 +60,14 @@ class RealFailureRegressionTests(unittest.TestCase):
                 result=engine.analyze(ROWS,CONTEXT,scope=SCOPE)
             self.assertEqual(result['diagnostic']['http_status'],401)
             self.assertNotIn(KEY,json.dumps(result))
+
+    def test_provider_error_codes_are_allowlisted_while_messages_and_unknown_codes_are_discarded(self):
+        for code,expected in [('json_validate_failed',True),(KEY,False)]:
+            body={'error':{'code':code,'type':'invalid_request_error','message':KEY,'failed_generation':KEY}}
+            socket=Mock();socket.recv.side_effect=[raw_response(400,body)]
+            with patch('advisor_groq.create_verified_connection',return_value=socket),self.assertRaises(AdvisorFailure) as caught:
+                cloud_exchange(b'{}',KEY,2)
+            diagnostic=caught.exception.diagnostic
+            self.assertEqual(diagnostic.get('provider_type'),'invalid_request_error')
+            self.assertEqual('provider_code' in diagnostic,expected)
+            self.assertNotIn(KEY,json.dumps(diagnostic))

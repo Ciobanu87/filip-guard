@@ -64,7 +64,12 @@ def cloud_exchange(body,key,timeout):
         if response.status!=200:
             delay=next((v for k,v in response.headers if k=='retry-after'),None)
             delay=float(delay) if delay and re.fullmatch(r'\d{1,4}(?:\.\d+)?',delay) else None
-            raise AdvisorFailure('http_error','http',http_status=response.status,retry_after=delay)
+            error={}
+            try:
+                envelope=strict_json(response.body.decode('utf-8'))
+                if type(envelope) is dict and type(envelope.get('error')) is dict:error=envelope['error']
+            except Exception:pass
+            raise AdvisorFailure('http_error','http',http_status=response.status,retry_after=delay,provider_code=error.get('code'),provider_type=error.get('type'))
         types=[v.lower().split(';')[0].strip() for k,v in response.headers if k=='content-type']
         if types!=['application/json'] or len(response.body)>65536:raise ValueError()
         stage='json';return strict_json(response.body.decode('utf-8'))
@@ -102,14 +107,14 @@ class GroqFreeProvider:
             except Exception:raise AdvisorFailure('key_unavailable','input') from None
             try:result=cloud_exchange(body,key,timeout)
             finally:key=None
-            if type(result) is not dict or result.get('model')!=self.model:raise ValueError()
+            if type(result) is not dict or result.get('model')!=self.model:raise AdvisorFailure('model_identity','provider',http_status=200)
             choices=result.get('choices');usage=result.get('usage')
-            if type(choices) is not list or len(choices)!=1 or type(choices[0]) is not dict or choices[0].get('finish_reason')!='stop':raise ValueError()
+            if type(choices) is not list or len(choices)!=1 or type(choices[0]) is not dict or choices[0].get('finish_reason')!='stop':raise AdvisorFailure('completion_incomplete','provider',http_status=200)
             message=choices[0].get('message')
             if (type(message) is not dict or message.get('role')!='assistant' or message.get('tool_calls')
-                    or message.get('function_call') or message.get('refusal') or type(message.get('content')) is not str):raise ValueError()
-            if type(usage) is not dict or any(type(usage.get(k)) is not int for k in ('prompt_tokens','completion_tokens','total_tokens')):raise ValueError()
-            if not 0<usage['completion_tokens']<=max_output_tokens or not 0<usage['prompt_tokens']<=8192 or usage['total_tokens']!=usage['prompt_tokens']+usage['completion_tokens']:raise ValueError()
+                    or message.get('function_call') or message.get('refusal') or type(message.get('content')) is not str):raise AdvisorFailure('unsafe_message','provider',http_status=200)
+            if type(usage) is not dict or any(type(usage.get(k)) is not int for k in ('prompt_tokens','completion_tokens','total_tokens')):raise AdvisorFailure('usage_rejected','provider',http_status=200)
+            if not 0<usage['completion_tokens']<=max_output_tokens or not 0<usage['prompt_tokens']<=8192 or usage['total_tokens']!=usage['prompt_tokens']+usage['completion_tokens']:raise AdvisorFailure('usage_rejected','provider',http_status=200)
             payload=strict_json(message['content'])
             self.last_diagnostic={'stage':'provider','code':'ok','http_status':200}
             self.successful_exchanges+=1;self.last_usage={k:usage[k] for k in ('prompt_tokens','completion_tokens','total_tokens')}
