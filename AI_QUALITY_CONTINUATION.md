@@ -135,9 +135,9 @@ semantic quality. No new live inference was available in the development worker.
 ### Phone-only, one-cell continuation without cloud-browser authentication
 
 `colab_resume_quality.py` runs inside the owner's already connected Colab kernel.
-It requires the existing SQLite ledger and the exact three completed quality
+It requires the existing SQLite ledger and the exact eight completed quality
 fixtures before any Groq call; it never creates an empty ledger to replace lost
-history. Evaluation source is pinned to `4be18386fe3cf7b42e7a8af85819c78dd593ca91`.
+history. Evaluation source is pinned to `61f27e7a86ed3515647c520117596c814318a7cf`.
 The helper refreshes imported source without restarting the kernel, reads the
 existing Colab secret once, resumes only unfinished fixtures using the unchanged
 budget/cooldown implementation, writes a private uniquely named report beside the
@@ -151,3 +151,15 @@ a new runtime, credential replacement, billing or editing multiple long cells.
 Google Colab still hosts the execution; a disconnected/destroyed runtime, missing
 history, secret permission error or active provider limit remains a real blocker.
 Development tests are offline contracts, not new owner-key live inference.
+
+
+### H1-only real continuation after the six-call report
+
+The helper now requires all eight accepted fixtures from the owner's latest real
+report and permits at most one unfinished fixture (`heading-context-en`). A runtime
+with only the first three results is blocked before reading the key or calling
+Groq, rather than repeating five subsequently accepted cases. The helper pins the
+corrected selection-validator source revision shown above, preserving the existing
+input hashes, ledger, reservations and provider cooldowns. Existing cached model
+selections receive the reviewed rendering fixes without new inference. See
+`AI_SEMANTIC_REVIEW_2026_11_24.md` for the actual-output assessment and its limits.

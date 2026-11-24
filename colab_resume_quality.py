@@ -10,9 +10,10 @@ import subprocess
 import sys
 import uuid
 
-REVISION = '4be18386fe3cf7b42e7a8af85819c78dd593ca91'
+REVISION = '61f27e7a86ed3515647c520117596c814318a7cf'
 REPOSITORY = 'https://github.com/Ciobanu87/filip-guard.git'
-REQUIRED = {'documentation', 'nonprofit', 'international'}
+REQUIRED = {'documentation', 'nonprofit', 'international', 'insufficient',
+            'wordpress-post', 'injection', 'image-caption-ro', 'sparse-context-en'}
 
 
 def existing_ledger(namespace):

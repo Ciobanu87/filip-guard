@@ -38,7 +38,7 @@ assess the rendered templates, **not** model-generated English/Romanian prose.
 | image-caption-ro | 4 | 4 | 3 | 3 | 3 | Relevant oak-table caption; correctly distinguishes decorative images and abstains from guessing ALT. Redundant punctuation remains a rendering issue. |
 | sparse-context-en | 2 | 3 | 1 | 4 | 1 | No invented draft, but calling “Home” the page topic gives false contextual confidence despite missing body content. |
 
-The eight accepted outputs average R=3.125, P=3.625, C=2.125, L=3.625, A=2.125.
+The eight accepted outputs average R=3.125, P=3.625, C=2.125, L=3.75, A=2.125.
 These are transparent reviewer assessments, not calibrated metrics. Six accepted
 cases select substantive context instead of only a crawl label; the unavailable
 and sparse cases appropriately lack a grounded draft. Structural success does
