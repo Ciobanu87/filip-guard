@@ -131,3 +131,23 @@ and confirmations. Keep that runtime/ledger when blocked by provider quota. Revi
 the downloaded report's new-call counters and selected evidence. English/Romanian
 rendering still uses reviewed templates; fixture gates do not establish human
 semantic quality. No new live inference was available in the development worker.
+
+### Phone-only, one-cell continuation without cloud-browser authentication
+
+`colab_resume_quality.py` runs inside the owner's already connected Colab kernel.
+It requires the existing SQLite ledger and the exact three completed quality
+fixtures before any Groq call; it never creates an empty ledger to replace lost
+history. Evaluation source is pinned to `4be18386fe3cf7b42e7a8af85819c78dd593ca91`.
+The helper refreshes imported source without restarting the kernel, reads the
+existing Colab secret once, resumes only unfinished fixtures using the unchanged
+budget/cooldown implementation, writes a private uniquely named report beside the
+ledger and triggers its download. It imports no AutoFix component and never logs
+a credential. Already completed full evaluations require no secret lookup.
+
+The owner only adds one new code cell to the existing notebook and runs a pinned
+GitHub download of this helper using `urllib.request` and `exec(compile(...))`.
+This deliberately does not require cloud-browser Google sign-in, a new notebook,
+a new runtime, credential replacement, billing or editing multiple long cells.
+Google Colab still hosts the execution; a disconnected/destroyed runtime, missing
+history, secret permission error or active provider limit remains a real blocker.
+Development tests are offline contracts, not new owner-key live inference.
