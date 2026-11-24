@@ -38,7 +38,8 @@ def render_guard_application(st_module=None,*,application=None):
                     ui.session_state['fg_customer_guard_site']=site['site_id'];ui.rerun()
         sites=[site for site in application.sites.list_sites(session) if site['origin'] in application.origins]
         if not sites:
-            ui.info('Authorize a test site to continue.');return True
+            ui.info('Authorize a WordPress test site for AutoFix, or a domain-owned resource below for read-only guards.')
+            render_monitoring(ui,service=application.monitor);return True
         names={site['site_id']:site['origin'] for site in sites};site_key='fg_customer_guard_site'
         if ui.session_state.get(site_key) not in names:ui.session_state.pop(site_key,None)
         site_id=ui.selectbox('Connected test site',list(names),format_func=lambda value:names[value],key=site_key)

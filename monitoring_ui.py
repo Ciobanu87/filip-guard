@@ -1,6 +1,7 @@
 """Authenticated monitoring controls and notification inbox. No repair controls."""
 from datetime import datetime,timezone
 from monitoring_configuration import configured_monitoring
+from guard_module_ui import render_asset_authorization,render_guard_settings,observation_rows
 
 
 def _when(value):
@@ -20,12 +21,15 @@ def render_monitoring(st_module=None,*,service=None):
         session=ui.session_state.get('fg_customer_session')
         if not session:
             ui.info('Sign in to manage monitoring for your authorized sites.');return
-        try:sites=service.directory.list_sites(session)
+        try:
+            render_asset_authorization(ui,service,session)
+            sites=service.directory.list_sites(session)
         except PermissionError:
             ui.warning('Your session has expired. Sign in again.');return
         if not sites:
-            ui.info('No authorized WordPress sites are connected to this account.');return
+            ui.info('No authorized sites or endpoints are connected to this account.');return
         names={site['site_id']:site['origin'] for site in sites}
+        if ui.session_state.get('fg_customer_monitor_site') not in names:ui.session_state.pop('fg_customer_monitor_site',None)
         site_id=ui.selectbox('Authorized site',list(names),format_func=lambda value:names[value],key='fg_customer_monitor_site')
         try:
             current=service.snapshot(session,site_id);schedule=current['schedule'] or {}
@@ -44,11 +48,18 @@ def render_monitoring(st_module=None,*,service=None):
                 service.configure(session,site_id,enabled=enabled,interval_seconds=frequency,
                     page_limit=int(pages),max_requests=max(20,int(pages)))
                 ui.success('Monitoring settings saved.');current=service.snapshot(session,site_id)
+            render_guard_settings(ui,service,session,site_id,names[site_id])
             if not service.health()['worker_recent']:
                 ui.warning('Periodic checks are waiting for the monitoring service to run.')
             last=current['last_check']
             ui.write('Last check: '+_when(last['finished_at'] if last else None))
-            if last:ui.caption('Check status: '+last['state'])
+            if last:
+                ui.caption('Check status: '+last['state'])
+                latest=service.history(session,site_id,limit=1)
+                checks=(latest[0].get('report') or {}).get('module_checks',[]) if latest else []
+                if checks:
+                    ui.write('Guard observations')
+                    ui.dataframe(observation_rows(checks),hide_index=True)
             ui.write('Known open issues')
             if current['findings']:
                 ui.dataframe([dict(Page=f['page'],Problem=f['problem'],Priority=f['priority']) for f in current['findings']],hide_index=True)

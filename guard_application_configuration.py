@@ -11,6 +11,7 @@ from customer_sites import CustomerSites
 from infrastructure_configuration import configured_external_store
 from guard_application import GuardApplication
 from monitoring_service import MonitoringService
+from guard_assets import GuardAssetDirectory
 from wordpress_rest_gateway import WordPressRESTGateway
 
 
@@ -33,6 +34,6 @@ def configured_guard_application():
     auth=CustomerAuth(os.environ['FG_CUSTOMER_AUTH_DB'])
     sites=CustomerSites(auth,os.environ['FG_CUSTOMER_DATA_ROOT'],master_keys,active_key_id=key_id,
                         object_store=store,gateway_factory=WordPressRESTGateway)
-    monitor=MonitoringService(sites,os.environ['FG_MONITOR_DB'])
+    monitor=MonitoringService(GuardAssetDirectory(sites),os.environ['FG_MONITOR_DB'])
     return GuardApplication(sites,monitor,authorized_test_origins=origins,
                             allow_registration=os.environ.get('FG_CUSTOMER_REGISTRATION')=='1')

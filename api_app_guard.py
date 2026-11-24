@@ -5,8 +5,10 @@ from guard_module_contract import Check
 def run(context,config):
     for path in config['paths']:
         url=context.origin+path
+        seen=False
         try:
             status,kind,body=context.site(path)
+            seen=True
             status_ok=status in config['statuses']
             yield Check('api','http-contract',url,'pass' if status_ok else 'fail',
                 'Endpoint status matches the configured contract.' if status_ok else 'Endpoint returned an unexpected HTTP status.',
@@ -21,8 +23,9 @@ def run(context,config):
                 'Public JSON shape matches configured keys.' if valid else 'Public JSON object, required keys or configured health values do not match.',
                 'Compare the response shape with the API contract. No response values or tokens are retained.')
         except (ValueError,UnicodeError):
-            yield Check('api','json-contract',url,'fail','Endpoint payload or secure HTTP response could not be validated.',
-                'Review content type, JSON syntax and the public health endpoint; do not disable TLS or framing checks.')
+            yield Check('api','json-contract' if seen else 'http-contract',url,'fail' if seen else 'unknown',
+                'Endpoint payload could not be validated.' if seen else 'Secure HTTP check was blocked or incomplete.',
+                'Review content type, JSON syntax, reachability and request limits; do not disable TLS or framing checks.')
         except Exception:
             yield Check('api','endpoint-unavailable',url,'unknown','Endpoint check could not be completed.',
                 'Review reachability, TLS and request limits; a network failure does not prove old issues resolved.')

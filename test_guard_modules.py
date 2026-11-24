@@ -38,6 +38,8 @@ class GuardContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):configure('https://example.com',{'api':{'paths':['/health'],'required_keys':['token']}})
         with self.assertRaises(ValueError):configure('https://example.com',{'infrastructure':{'registered_domain':'other.com'}})
         with self.assertRaises(ValueError):configure('https://example.com',{'infrastructure':{'expected_ips':['127.0.0.1']}})
+        for status in (206,301,304):
+            with self.assertRaises(ValueError):configure('https://example.com',{'api':{'paths':['/health'],'statuses':[status]}})
         self.assertEqual(configure('https://shop.example.com',{'infrastructure':{'registered_domain':'example.com'}})['infrastructure']['registered_domain'],'example.com')
 
 
@@ -77,6 +79,9 @@ class ModuleBehaviorTests(unittest.TestCase):
         product['offers']['price']='-1';html='<script type="application/ld+json">'+json.dumps(product)+'</script>'
         self.assertEqual(list(commerce_guard.run(Context((200,'text/html',html.encode())),config))[-1].status,'fail')
         self.assertEqual(list(commerce_guard.run(Context((200,'text/html',b'<h1>Table</h1>')),config))[-1].status,'fail')
+        product['offers']={'@type':'AggregateOffer','lowPrice':'10','highPrice':'20','priceCurrency':'EUR'}
+        html='<script type="application/ld+json">'+json.dumps(product)+'</script>'
+        self.assertEqual(list(commerce_guard.run(Context((200,'text/html',html.encode())),config))[-1].status,'pass')
 
     def test_dns_and_tls_expiry_are_verified_not_guessed(self):
         config=configure(Context.origin,{'infrastructure':{'expected_ips':['93.184.216.34']}})['infrastructure']
@@ -126,6 +131,7 @@ class ComposedGuardTests(unittest.TestCase):
         with patch('guard_network._https_request_exchange',return_value=raw) as exchange,patch('guard_network.resolve_public_ips') as dns,patch('guard_network.create_verified_connection') as tls:
             report=GuardModuleScan(settings,min_gap=0)('https://example.com',max_requests=2)
         self.assertEqual(exchange.call_count,2);dns.assert_not_called();tls.assert_not_called()
+        self.assertEqual(report.findings,())
         self.assertEqual(report.requests,2);self.assertFalse(report.complete)
         self.assertTrue(any(check['status']=='unknown' for check in report.module_checks))
         self.assertTrue(all(check['autofix'] is False for check in report.module_checks))

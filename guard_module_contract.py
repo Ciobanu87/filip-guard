@@ -54,14 +54,14 @@ def configure(origin,settings):
         elif name=='api':
             if set(item)-{'paths','statuses','require_json','required_keys','json_equals'}:raise ValueError('Unknown API setting')
             statuses=item.get('statuses',[200]);keys=item.get('required_keys',[]);require=item.get('require_json',True)
-            if (type(statuses) is not list or not 1<=len(statuses)<=5 or any(type(v) is not int or not 200<=v<=599 for v in statuses)
+            if (type(statuses) is not list or not 1<=len(statuses)<=5 or any(type(v) is not int or not 200<=v<=599 or v==206 or 300<=v<400 for v in statuses)
                     or len(set(statuses))!=len(statuses) or type(require) is not bool or type(keys) is not list or len(keys)>8
                     or any(type(k) is not str or not re.fullmatch('[A-Za-z][A-Za-z0-9_-]{0,39}',k)
                            or re.search('secret|token|password|credential|authorization|cookie|session|key',k,re.I) for k in keys)
                     or len(set(keys))!=len(keys) or (keys and not require)):
                 raise ValueError('Invalid public API expectations; credentials are not supported')
             expected=item.get('json_equals',{})
-            if (type(expected) is not dict or len(expected)>8 or (expected and not require)
+            if (type(expected) is not dict or len(expected)>1 or (expected and not require)
                     or any(type(k) is not str or not re.fullmatch('[A-Za-z][A-Za-z0-9_-]{0,39}',k) or re.search('secret|token|password|credential|authorization|cookie|session|key',k,re.I) for k in expected)
                     or any(type(v) not in (str,bool,int) or (type(v) is str and (len(v)>80 or clean(v,80)!=v)) or (type(v) is int and abs(v)>1000000000) for v in expected.values())):
                 raise ValueError('Only bounded nonsecret public health expectations are supported')
@@ -69,7 +69,7 @@ def configure(origin,settings):
         else:
             if set(item)-{'expected_ips','warn_days','registered_domain'}:raise ValueError('Unknown infrastructure setting')
             addresses=item.get('expected_ips',[]);days=item.get('warn_days',30);domain=item.get('registered_domain')
-            if type(addresses) is not list or len(addresses)>8 or any(type(v) is not str or not ipaddress.ip_address(v).is_global for v in addresses):
+            if type(addresses) is not list or len(addresses)>8 or any(type(v) is not str or '%' in v or not ipaddress.ip_address(v).is_global for v in addresses):
                 raise ValueError('Expected DNS addresses must be public')
             if type(days) is not int or not 1<=days<=90:raise ValueError('Expiry warning must be 1–90 days')
             if domain is not None:
@@ -77,7 +77,7 @@ def configure(origin,settings):
                 parsed,_,_=target_url('https://'+domain)
                 if parsed!=domain or not (host==domain or host.endswith('.'+domain)) or domain.count('.')<1:
                     raise ValueError('Registered domain must contain the authorized site')
-            result[name]={'expected_ips':sorted(set(addresses)),'warn_days':days,'registered_domain':domain}
+            result[name]={'expected_ips':sorted({str(ipaddress.ip_address(value)) for value in addresses}),'warn_days':days,'registered_domain':domain}
     if not result['website'] and not any(name in result for name in MODULES):raise ValueError('At least one guard is required')
     return result
 
@@ -105,3 +105,10 @@ class Check:
         key=sha256(json.dumps([CONTRACT_VERSION,kind,self.url],separators=(',',':')).encode()).hexdigest()
         return dict(key=key,scope_kind=kind,scope_key=self.url,reason=self.problem,
                     risk='Verify the observed condition before any separately authorized change.',**data)
+
+
+def defaults(kind=None):
+    if kind=='api':return {'website':False,'api':{'paths':['/'],'statuses':[200],'require_json':False,'required_keys':[],'json_equals':{}}}
+    if kind=='commerce':return {'website':False,'commerce':{'paths':['/'],'require_product':False,'expected_currency':None}}
+    if kind=='infrastructure':return {'website':False,'infrastructure':{'expected_ips':[],'warn_days':30,'registered_domain':None}}
+    return {'website':True}

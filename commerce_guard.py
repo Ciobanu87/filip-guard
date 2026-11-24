@@ -40,8 +40,12 @@ def run(context,config):
             for offer in offers:
                 if type(offer) is not dict:errors.append('invalid-offer');continue
                 try:
-                    price=Decimal(str(offer.get('price','')))
+                    aggregate=offer.get('@type')=='AggregateOffer'
+                    price=Decimal(str(offer.get('lowPrice','') if aggregate else offer.get('price','')))
                     if not price.is_finite() or price<0:raise InvalidOperation()
+                    if aggregate and 'highPrice' in offer:
+                        upper=Decimal(str(offer['highPrice']))
+                        if not upper.is_finite() or upper<price:raise InvalidOperation()
                 except (InvalidOperation,ValueError):errors.append('invalid-price')
                 currency=offer.get('priceCurrency')
                 if config['expected_currency'] and currency!=config['expected_currency']:errors.append('currency-mismatch')

@@ -25,12 +25,13 @@ def _json(value):return json.dumps(value,separators=(',',':'),ensure_ascii=True,
 class MonitoringService:
     MIN_INTERVAL=900
     MAX_ATTEMPTS=3
-    def __init__(self,directory,database_path,*,scanner=None,lease_seconds=90,notification_window=3600):
+    def __init__(self,directory,database_path,*,scanner=None,lease_seconds=90,notification_window=3600,module_runner=None):
         if type(lease_seconds) is not int or not 90<=lease_seconds<=300:raise ValueError('Invalid monitoring lease')
         if type(notification_window) is not int or not 900<=notification_window<=86400:raise ValueError('Invalid notification window')
         self.directory,self.auth=directory,directory.auth
         self.path=private_database(database_path)
         self.scanner=scanner if scanner is not None else SecureMonitoringScan()
+        self.module_runner=module_runner
         self.lease_seconds,self.window=lease_seconds,notification_window
         with self.db() as db:
             db.executescript('''CREATE TABLE IF NOT EXISTS monitor_schedules (
@@ -57,6 +58,8 @@ class MonitoringService:
                 notification_id TEXT PRIMARY KEY, state TEXT NOT NULL, not_before REAL NOT NULL,
                 lease_token TEXT, lease_until REAL, attempts INTEGER NOT NULL DEFAULT 0,
                 sent_at REAL, error TEXT);
+                CREATE TABLE IF NOT EXISTS monitor_guard_settings (
+                site_id TEXT PRIMARY KEY,customer_id TEXT NOT NULL,settings TEXT NOT NULL,updated_at REAL NOT NULL);
                 CREATE TABLE IF NOT EXISTS monitor_runtime (name TEXT PRIMARY KEY,value REAL NOT NULL);
                 CREATE INDEX IF NOT EXISTS monitor_due ON monitor_schedules(enabled,next_due);
             ''')
@@ -80,6 +83,10 @@ class MonitoringService:
         target_url(site['origin'])
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            kind=dict(site).get('guard_kind')
+            if kind:
+                from guard_module_contract import defaults
+                db.execute('INSERT OR IGNORE INTO monitor_guard_settings VALUES (?,?,?,?)',(site_id,principal.customer_id,_json(defaults(kind)),timestamp))
             row=db.execute('SELECT * FROM monitor_schedules WHERE site_id=?',(site_id,)).fetchone()
             if row and row['customer_id']!=principal.customer_id:raise PermissionError('Monitoring site ownership mismatch')
             values=(int(enabled),interval_seconds,page_limit,max_requests)
@@ -100,6 +107,37 @@ class MonitoringService:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)''',
                     (site_id,principal.customer_id,site['origin'],*values,due))
         return self.snapshot(session,site_id,now=now)
+
+    def module_settings(self,session,site_id,*,now=None):
+        principal,site=self._owned(session,site_id,now)
+        with self.db() as db:
+            row=db.execute('SELECT settings FROM monitor_guard_settings WHERE site_id=? AND customer_id=?',
+                           (site_id,principal.customer_id)).fetchone()
+        from guard_module_contract import defaults
+        return json.loads(row[0]) if row else defaults(dict(site).get('guard_kind'))
+
+    def configure_modules(self,session,site_id,settings,*,now=None):
+        from guard_module_contract import configure
+        principal,site=self._owned(session,site_id,now);timestamp=instant(now)
+        value=configure(site['origin'],settings);encoded=_json(value)
+        with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
+            old=db.execute('SELECT customer_id,settings FROM monitor_guard_settings WHERE site_id=?',(site_id,)).fetchone()
+            if old and old['customer_id']!=principal.customer_id:raise PermissionError('Guard ownership mismatch')
+            if old and old['settings']==encoded:return value
+            schedule=db.execute('SELECT * FROM monitor_schedules WHERE site_id=?',(site_id,)).fetchone()
+            if schedule:
+                if schedule['customer_id']!=principal.customer_id:raise PermissionError('Guard ownership mismatch')
+                if schedule['run_id']:
+                    db.execute("UPDATE monitor_runs SET state='cancelled',finished_at=? WHERE run_id=? AND state='running'",
+                               (timestamp,schedule['run_id']))
+                # Keep the cadence and never reuse a cancelled run's unique slot.
+                latest=db.execute('SELECT MAX(scheduled_at) FROM monitor_runs WHERE site_id=?',(site_id,)).fetchone()[0]
+                due=max(schedule['next_due'],timestamp,latest+self.MIN_INTERVAL if latest is not None else timestamp)
+                db.execute('UPDATE monitor_schedules SET revision=revision+1,next_due=?,lease_token=NULL,lease_until=NULL,run_id=NULL WHERE site_id=?',(due,site_id))
+            db.execute('INSERT INTO monitor_guard_settings VALUES (?,?,?,?) ON CONFLICT(site_id) DO UPDATE SET settings=excluded.settings,updated_at=excluded.updated_at',
+                       (site_id,principal.customer_id,encoded,timestamp))
+        return value
 
     def snapshot(self,session,site_id,*,now=None):
         principal,_=self._owned(session,site_id,now)
@@ -139,9 +177,12 @@ class MonitoringService:
             if changed.rowcount!=1:raise PermissionError('Notification unavailable for this account')
 
     def _binding(self,customer_id,site_id,origin):
-        with self.directory.db() as db:
-            site=db.execute('SELECT 1 FROM customer_sites WHERE customer_id=? AND site_id=? AND origin=?',
-                            (customer_id,site_id,origin)).fetchone()
+        checker=getattr(self.directory,'monitoring_binding',None)
+        if callable(checker):site=checker(customer_id,site_id,origin)
+        else:
+            with self.directory.db() as db:
+                site=db.execute('SELECT 1 FROM customer_sites WHERE customer_id=? AND site_id=? AND origin=?',
+                                (customer_id,site_id,origin)).fetchone()
         with self.auth.db() as db:
             active=db.execute('SELECT 1 FROM customers WHERE customer_id=? AND active=1',(customer_id,)).fetchone()
         return bool(site and active)
@@ -230,6 +271,10 @@ class MonitoringService:
             for finding in report.findings:
                 target_url(finding['scope_key'],host)
                 if finding.get('autofix') is not False:raise ValueError('Monitoring cannot authorize repairs')
+            if len(report.module_checks)>20:raise ValueError('Module observation bound exceeded')
+            for check in report.module_checks:
+                target_url(check['page'],host)
+                if check.get('autofix') is not False:raise ValueError('Guard modules cannot authorize repairs')
             serialized=_json(asdict(report))
             if len(serialized)>2_000_000:raise ValueError('Monitoring result too large')
         else:serialized=None
@@ -318,7 +363,14 @@ class MonitoringService:
                 time.sleep(min(wait,1))
         try:
             checkpoint()
-            report=self.scanner(job['origin'],page_limit=job['page_limit'],max_requests=job['max_requests'],
+            with self.db() as db:
+                row=db.execute('SELECT settings FROM monitor_guard_settings WHERE site_id=? AND customer_id=?',(job['site_id'],job['customer_id'])).fetchone()
+            selected=json.loads(row[0]) if row else {'website':True}
+            scanner=self.scanner
+            if selected!={'website':True}:
+                from guard_module_scan import GuardModuleScan
+                scanner=(self.module_runner or GuardModuleScan)(selected,website=self.scanner)
+            report=scanner(job['origin'],page_limit=job['page_limit'],max_requests=job['max_requests'],
                                 before_request=reserve,checkpoint=checkpoint)
             return self.publish(job,report,now=now)
         except LeaseLost:
