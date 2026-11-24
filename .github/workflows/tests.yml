@@ -94,3 +94,36 @@ jobs:
           name: filip-guard-integrated-ui-proof
           path: ${{ runner.temp }}/filip-guard-ui-proof.json
           if-no-files-found: ignore
+
+
+  real-infrastructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned official MinIO source for isolated tests
+        uses: actions/checkout@v4
+        with:
+          repository: minio/minio
+          ref: 9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a
+          path: .ci-minio
+          persist-credentials: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.8'
+          cache-dependency-path: .ci-minio/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install application and isolated SMTP test dependencies
+        run: python -m pip install -r requirements.txt aiosmtpd==1.4.6
+      - name: Build official security-fixed S3 test server
+        working-directory: .ci-minio
+        env:
+          CGO_ENABLED: '0'
+          GOMAXPROCS: '2'
+        run: go build -trimpath -o "$RUNNER_TEMP/fg-minio" .
+      - name: Verify encrypted S3 recovery, persistence and TLS SMTP delivery
+        env:
+          FG_MINIO_BINARY: ${{ runner.temp }}/fg-minio
+        run: python tests/real_infrastructure/run.py
