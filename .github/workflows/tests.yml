@@ -127,3 +127,17 @@ jobs:
         env:
           FG_MINIO_BINARY: ${{ runner.temp }}/fg-minio
         run: python tests/real_infrastructure/run.py
+
+
+  container-persistence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build nonroot application image without secrets
+        run: docker build -f deployment/Dockerfile -t filip-guard-ci:proof .
+      - name: Verify Streamlit restart, private persistent state and separate worker
+        run: python tests/real_infrastructure/container_restart.py

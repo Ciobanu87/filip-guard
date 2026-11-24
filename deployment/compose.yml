@@ -1,0 +1,49 @@
+# Authorized isolated test host only. No account provisioning, billing or deployment.
+services:
+  ui:
+    image: filip-guard-development:local
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    ports:
+      - "127.0.0.1:8501:8501"
+    env_file:
+      - ${FG_OPERATOR_ENV_FILE:?Select the private operator environment file}
+    volumes:
+      - guard-state:/var/lib/filip-guard
+      - type: bind
+        source: ${FG_OPERATOR_SECRETS_DIRECTORY:?Select existing private secret mounts}
+        target: /run/filip-guard-secrets
+        read_only: true
+        bind:
+          create_host_path: false
+    init: true
+    restart: "on-failure:3"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+  worker:
+    image: filip-guard-development:local
+    profiles: [monitoring]
+    command: [python, monitoring_worker.py]
+    env_file:
+      - ${FG_OPERATOR_ENV_FILE:?Select the private operator environment file}
+    volumes:
+      - guard-state:/var/lib/filip-guard
+      - type: bind
+        source: ${FG_OPERATOR_SECRETS_DIRECTORY:?Select existing private secret mounts}
+        target: /run/filip-guard-secrets
+        read_only: true
+        bind:
+          create_host_path: false
+    init: true
+    restart: "on-failure:3"
+    healthcheck:
+      disable: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  guard-state:
