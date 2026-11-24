@@ -153,6 +153,15 @@ class ContextualAdvisor:
 
 def configured_advisor():
     if os.environ.get('FG_AI_AUTHORIZED')!='1':return None
-    if os.environ.get('FG_AI_PROVIDER','ollama-local')!='ollama-local':raise ValueError('No paid/cloud provider authorized')
-    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],OllamaProvider(os.environ.get('FG_AI_MODEL','qwen3:8b')),
+    kind=os.environ.get('FG_AI_PROVIDER','ollama-local')
+    if kind=='ollama-local':provider=OllamaProvider(os.environ.get('FG_AI_MODEL','qwen3:8b'))
+    elif kind=='groq-free':
+        from advisor_groq import GroqFreeProvider,MODEL
+        from operator_secrets import private_file
+        key_path=os.environ['FG_GROQ_API_KEY_FILE']
+        provider=GroqFreeProvider(lambda:private_file(key_path,256).decode('ascii').strip(),
+            model=os.environ.get('FG_AI_MODEL',MODEL),free_plan_confirmed=os.environ.get('FG_AI_FREE_PLAN_CONFIRMED')=='1',
+            data_consent=os.environ.get('FG_AI_CLOUD_DATA_CONSENT')=='1')
+    else:raise ValueError('Unreviewed model provider')
+    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,
         daily_calls=int(os.environ.get('FG_AI_DAILY_CALLS','20')))
