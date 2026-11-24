@@ -95,3 +95,39 @@ inference was performed here. Automated fixture/contract tests and the prepared
 continuation are complete; actual English/Romanian holdout outputs and latency
 still require that owner-authorized Colab run. If quotas stop it, preserve the
 report and wait for admission; do not erase state or change accounts.
+
+### Colab credential-readiness recovery (24 November 2026)
+
+The attached owner report contains three accepted cached results (documentation,
+nonprofit, international), **zero new requests/responses**, two cached
+`key_unavailable` failures and two fresh input failures near ten seconds. It does
+not establish that the key is invalid or permission was revoked. The previous
+notebook discarded the successfully checked key and called `userdata.get()` again
+for every provider request. Colab's official `google/colab/userdata.py` uses a
+frontend GetSecret RPC with a ten-second timeout; the old generic diagnostic
+cannot establish which underlying exception occurred retrospectively.
+
+Setup now reads the existing secret once into a redacted session-only holder.
+Timeout, permission denial, missing secret, invalid key and closed holder have
+separate allowlisted diagnostics without exception bodies or secret values.
+Credential readiness is checked before a new budget reservation. Old credential
+failures are not replayed as persistent model-validation failures; existing
+reservations, pacing and provider-wide 429 cooldowns remain unchanged. A setup
+failure invalidates the old notebook advisor, so running a later cell cannot
+silently reuse stale configuration. No new key or credential file is required.
+
+Quality continuation reads previously accepted immutable synthetic fixture results
+using the exact original input/version/provider hash and original scoped cache
+key, even after the one-hour success-cache expiry. It does **not** make expired
+live-site advice reusable. Completed cases remain visibly historical; new request,
+response and real-inference counters exclude them. The three accepted fixtures
+therefore leave six pending cases, with no reset, automatic retry or repeated
+secret RPC. This history is durable across application/source restarts using the
+same SQLite ledger, not destruction of the free Colab runtime. No key or ledger
+is uploaded automatically to a third-party persistence service.
+
+Run the updated notebook in the existing Colab runtime with the existing secret
+and confirmations. Keep that runtime/ledger when blocked by provider quota. Review
+the downloaded report's new-call counters and selected evidence. English/Romanian
+rendering still uses reviewed templates; fixture gates do not establish human
+semantic quality. No new live inference was available in the development worker.

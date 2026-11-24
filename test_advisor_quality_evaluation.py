@@ -49,3 +49,42 @@ class QualityContinuationTests(unittest.TestCase):
         self.assertEqual(api.call_count,1);self.assertTrue(report['stopped_early'])
         self.assertTrue(any(x['status']=='not-run' for x in report['cases']))
         with self.engine.db() as db:self.assertEqual(db.execute('SELECT calls FROM advisor_budget').fetchone()[0],1)
+
+    def test_three_completed_fixtures_survive_expiry_and_restart_only_six_calls_remain(self):
+        from validate_cloud_advisor import run_validation
+        with patch('advisor_groq.cloud_exchange',side_effect=self.valid) as api:
+            first=run_validation(self.engine,wait=self.wait,case_specs=quality_cases()[:3])
+        self.assertEqual(first['accepted_ai_cases'],3)
+        self.now+=7200
+        restarted=ContextualAdvisor(self.engine.path,self.engine.provider,clock=lambda:self.now,max_output_tokens=256)
+        with patch('advisor_groq.cloud_exchange',side_effect=self.valid) as api:
+            report=run_quality_evaluation(restarted,wait=self.wait)
+        self.assertEqual(api.call_count,6)
+        self.assertEqual(report['completed_before_this_run'],3)
+        self.assertEqual(report['accepted_ai_cases'],9)
+        self.assertEqual(report['planned_provider_calls_max'],6)
+        self.assertTrue(all(not x['provider_request_attempted'] for x in report['cases'][:3]))
+        self.assertEqual(report['observable_quality_passes'],9)
+        with self.engine.db() as db:self.assertEqual(db.execute('SELECT SUM(calls) FROM advisor_budget').fetchone()[0],9)
+        self.now+=7200
+        with patch('advisor_groq.cloud_exchange') as api:
+            again=run_quality_evaluation(restarted,wait=self.wait)
+        api.assert_not_called()
+        self.assertEqual(again['completed_before_this_run'],9)
+        self.assertFalse(again['real_inference_executed'])
+
+    def test_completed_fixture_replay_does_not_clear_provider_cooldown(self):
+        from validate_cloud_advisor import run_validation
+        with patch('advisor_groq.cloud_exchange',side_effect=self.valid):
+            run_validation(self.engine,wait=self.wait,case_specs=quality_cases()[:3])
+        self.now+=61
+        from advisor_diagnostics import AdvisorFailure
+        with patch('advisor_groq.cloud_exchange',side_effect=AdvisorFailure('http_error','http',http_status=429,retry_after=3600,provider_code='rate_limit_exceeded',provider_type='tokens')) as api:
+            report=run_quality_evaluation(self.engine,wait=self.wait)
+        self.assertEqual(api.call_count,1)
+        self.assertEqual(report['completed_before_this_run'],3)
+        self.assertTrue(report['stopped_early'])
+        with patch('advisor_groq.cloud_exchange') as api:
+            again=run_quality_evaluation(self.engine,wait=self.wait)
+        api.assert_not_called()
+        self.assertEqual(again['cases'][3]['status'],'provider-cooldown')
