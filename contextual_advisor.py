@@ -122,6 +122,10 @@ class ContextualAdvisor:
             if old and old[0]>now:
                 checkpoint()
                 return json.loads(old[2]) if old[1]=='complete' else {**fallback,'status':'cached-failure' if old[1]=='failed' else 'busy'}
+            interval=getattr(self.provider,'minimum_interval',0)
+            latest=db.execute('SELECT MAX(started) FROM advisor_requests').fetchone()[0]
+            if interval and latest is not None and now-latest<interval:
+                return {**fallback,'status':'rate-limit'}
             if db.execute("SELECT 1 FROM advisor_requests WHERE state='pending' AND expires>? LIMIT 1",(now,)).fetchone():
                 return {**fallback,'status':'busy'}
             if db.execute('SELECT count(*) FROM advisor_requests WHERE day=?',(day,)).fetchone()[0]>=self.daily_calls:
@@ -163,5 +167,6 @@ def configured_advisor():
             model=os.environ.get('FG_AI_MODEL',MODEL),free_plan_confirmed=os.environ.get('FG_AI_FREE_PLAN_CONFIRMED')=='1',
             data_consent=os.environ.get('FG_AI_CLOUD_DATA_CONSENT')=='1')
     else:raise ValueError('Unreviewed model provider')
-    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,
-        daily_calls=int(os.environ.get('FG_AI_DAILY_CALLS','20')))
+    daily=int(os.environ.get('FG_AI_DAILY_CALLS','20'))
+    if kind=='groq-free' and daily>20:raise ValueError('Cloud free-test daily limit cannot exceed 20')
+    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,daily_calls=daily)

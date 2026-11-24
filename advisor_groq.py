@@ -50,13 +50,17 @@ def cloud_exchange(body,key,timeout):
 
 class GroqFreeProvider:
     name='groq-free'
+    minimum_interval=61
     def __init__(self,key_provider,*,model=MODEL,free_plan_confirmed=False,data_consent=False):
         if model!=MODEL or not callable(key_provider):raise ValueError('Reviewed cloud model and explicit key provider required')
         if free_plan_confirmed is not True or data_consent is not True:
             raise ValueError('Free organization and sanitized-data transfer must be explicitly confirmed')
-        self.model=model;self.keys=key_provider
+        self.model=model;self.keys=key_provider;self.successful_exchanges=0;self.last_usage=None
     def generate(self,messages,schema,*,timeout=15,max_output_tokens=1200):
         if not 1<=timeout<=20 or not 64<=max_output_tokens<=1600:raise ValueError('Bounded inference required')
+        # Conservative input-byte bound in addition to the provider's token limits.
+        if sum(len(m['content'].encode('utf-8')) for m in messages)+len(json.dumps(schema).encode())>6000:
+            raise ProviderUnavailable('Cloud context exceeds conservative free-test bound')
         # Schema constraints still undergo full independent semantic validation.
         body=json.dumps({'model':self.model,'messages':messages,'stream':False,'temperature':0,
             'reasoning_effort':'none','reasoning_format':'hidden','max_completion_tokens':max_output_tokens,
@@ -71,5 +75,7 @@ class GroqFreeProvider:
                     or message.get('function_call') or message.get('refusal') or type(message.get('content')) is not str):raise ValueError()
             if type(usage) is not dict or any(type(usage.get(k)) is not int for k in ('prompt_tokens','completion_tokens','total_tokens')):raise ValueError()
             if not 0<usage['completion_tokens']<=max_output_tokens or not 0<usage['prompt_tokens']<=8192 or usage['total_tokens']!=usage['prompt_tokens']+usage['completion_tokens']:raise ValueError()
-            return strict_json(message['content'])
+            payload=strict_json(message['content'])
+            self.successful_exchanges+=1;self.last_usage={k:usage[k] for k in ('prompt_tokens','completion_tokens','total_tokens')}
+            return payload
         except Exception:raise ProviderUnavailable('Cloud response rejected; rules retained') from None

@@ -57,7 +57,7 @@ def render_guard_application(st_module=None,*,application=None):
         if scan:
             ui.write('Scanner results');ui.dataframe(scan['report']['rows'],hide_index=True)
             ui.write('AI Advisor recommendations')
-            ui.caption('Rules detect problems. Optional local AI selects checked page evidence; it cannot authorize repairs.')
+            ui.caption('Rules detect problems. Optional AI selects sanitized public page evidence; it cannot authorize repairs.')
             if ui.button('Analyze context with AI',key=prefix+'_advisor_'+scan['scan_id']):
                 application.advice(session,site_id,scan['scan_id'],generate=True);ui.rerun()
             advice=application.advice(session,site_id,scan['scan_id'])

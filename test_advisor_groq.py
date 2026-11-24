@@ -69,7 +69,7 @@ class GroqProviderTests(unittest.TestCase):
             with patch('advisor_groq.cloud_exchange',side_effect=inference) as exchange:
                 self.assertEqual(engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
                 self.assertEqual(engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
-                self.assertEqual(engine.analyze(ROWS,CONTEXT,scope='c'*32+':'+'d'*32)['status'],'daily-limit')
+                self.assertEqual(engine.analyze(ROWS,CONTEXT,scope='c'*32+':'+'d'*32)['status'],'rate-limit')
                 exchange.assert_called_once()
     def test_configuration_loads_only_explicit_private_key_without_enabling_by_default(self):
         with tempfile.TemporaryDirectory() as root:
@@ -78,3 +78,18 @@ class GroqProviderTests(unittest.TestCase):
                  'FG_AI_FREE_PLAN_CONFIRMED':'1','FG_AI_CLOUD_DATA_CONSENT':'1','FG_AI_LEDGER_DB':str(Path(root)/'ledger.sqlite')}
             with patch.dict(os.environ,env,clear=True),patch('advisor_groq.cloud_exchange') as network:
                 engine=configured_advisor();self.assertEqual(engine.provider.name,'groq-free');network.assert_not_called()
+    def test_oversized_cloud_context_is_blocked_before_key_access_or_network(self):
+        keys=Mock(return_value=KEY)
+        provider=GroqFreeProvider(keys,free_plan_confirmed=True,data_consent=True)
+        with patch('advisor_groq.cloud_exchange') as network,self.assertRaises(ProviderUnavailable):
+            provider.generate([{'role':'user','content':'x'*6001}],{})
+        keys.assert_not_called();network.assert_not_called()
+    def test_cloud_minute_limit_survives_reconstruction_and_is_shared_across_scopes(self):
+        with tempfile.TemporaryDirectory() as root:
+            path=Path(root)/'ledger.sqlite';provider=self.provider()
+            def inference(body,*args):return response(selection(json.loads(json.loads(body)['messages'][1]['content'])))
+            with patch('advisor_groq.cloud_exchange',side_effect=inference) as network:
+                self.assertEqual(ContextualAdvisor(path,provider,clock=lambda:100).analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
+                self.assertEqual(ContextualAdvisor(path,provider,clock=lambda:101).analyze(ROWS,CONTEXT,scope='c'*32+':'+'d'*32)['status'],'rate-limit')
+                self.assertEqual(ContextualAdvisor(path,provider,clock=lambda:161).analyze(ROWS,CONTEXT,scope='c'*32+':'+'d'*32)['status'],'model-assisted')
+                self.assertEqual(network.call_count,2)

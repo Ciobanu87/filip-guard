@@ -1,5 +1,9 @@
 # Contextual Advisor — implemented integration, real inference not validated
 
+Update: a separate opt-in Groq Free cloud adapter and phone-accessible Colab
+validation path are now prepared. See [CLOUD_AI_VALIDATION.md](CLOUD_AI_VALIDATION.md).
+The local-provider details below remain applicable; no real inference is claimed.
+
 The existing Scanner, deterministic `analyze_pages`, verified repair coordinator
 and monitoring remain the sources of observations and authorization. The optional
 model adapter enriches a user's explicit analysis request; it is not an agent
