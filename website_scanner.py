@@ -78,7 +78,7 @@ def normalize_link(base, href, host):
     return link
 
 
-def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, max_discovered=None, link_observer=None):
+def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, max_discovered=None, link_observer=None, context_observer=None):
     if not urlparse(start).scheme:
         start = 'https://' + start
     (initial_validator or validate_url)(start)
@@ -100,6 +100,9 @@ def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, m
             if not html:
                 rows.append({'page': url, 'http_status': status, 'response_seconds': duration, 'title': '', 'meta_description': '', 'h1_count': 0, 'images_missing_alt': 0, 'issues': 'Non-HTML or empty page'})
                 continue
+            if context_observer is not None:
+                from advisor_context import extract_context
+                context_observer(url,extract_context(html))
             soup = BeautifulSoup(html, 'html.parser')
             title = soup.title.get_text(' ', strip=True) if soup.title else ''
             desc_tag = soup.find('meta', attrs={'name': lambda v: isinstance(v, str) and v.lower() == 'description'})
