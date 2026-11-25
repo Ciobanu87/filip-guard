@@ -29,6 +29,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from external_backup_store import S3BackupConfig,configured_s3_store,ObjectStoreError
 from operations_backup import probe_external_backup,export_recovery_manifest
+from application_state_backup import export_application_state, recover_application_state, REVIEW_MARKER
+from customer_auth import CustomerAuth
 from monitoring_email import SMTPConfig,SMTPNotificationSender,VerifiedEmailBinding,MonitoringEmailDispatcher,DeliveryNotStarted
 import test_guard_application as application_fixture
 import test_monitoring_service as monitoring_fixture
@@ -207,7 +209,27 @@ class Infrastructure(unittest.TestCase):
         with self.trusted_tls():self.assertEqual(restarted.dispatch_once(now=7200)['status'],'idle')
         self.assertEqual(len(self.messages),before+1)
 
-
+    @unittest.skipIf('--smtp-only' in sys.argv,'S3 tests require CI-built official MinIO binary')
+    def test_08_application_state_recovery_over_real_s3_with_stopped_source(self):
+        # Private synthetic state, all SQLite connections closed; not a cloud-host drill.
+        with tempfile.TemporaryDirectory(prefix='fg-state-real-s3-') as directory:
+            root=Path(directory); source=root/'source'; source.mkdir(mode=0o700)
+            auth=CustomerAuth(source/'accounts.sqlite')
+            auth.register('recovery-proof','Synthetic-recovery-password')
+            key=secrets.token_bytes(32); keys=lambda version:key
+            store=self.new_store()
+            receipt=export_application_state(source,store,keys,deployment_id='d'*32,key_id='fixture-v1',quiesced=True)
+            # Fresh SDK client + new destination; old DB/session is not consulted.
+            fresh=configured_s3_store(S3BackupConfig('https://object.test',store.bucket),lambda:(self.user,self.password))
+            destination=root/'restored'
+            result=recover_application_state(fresh,keys,receipt,destination)
+            self.assertTrue(result['verified']); self.assertTrue(result['resume_blocked'])
+            self.assertEqual((source/'accounts.sqlite').read_bytes(),(destination/'accounts.sqlite').read_bytes())
+            with self.assertRaises(ValueError): CustomerAuth(destination/'accounts.sqlite')
+            # Explicit simulated operator review of this disposable offline fixture only.
+            (destination/REVIEW_MARKER).unlink()
+            recovered=CustomerAuth(destination/'accounts.sqlite')
+            self.assertEqual(recovered.resolve(recovered.login('recovery-proof','Synthetic-recovery-password')).username,'recovery-proof')
 SMTP_ONLY='--smtp-only' in sys.argv
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(Infrastructure)

@@ -36,6 +36,8 @@ def instant(now=None):
 
 def private_database(path):
     path = Path(path)
+    if any((parent / 'FG-RESTORE-REVIEW-REQUIRED').exists() for parent in path.absolute().parents):
+        raise ValueError('Recovered application state requires operator reconciliation before resume')
     if str(path) == ':memory:' or path.is_symlink():
         raise ValueError('Private persistent database path required')
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
