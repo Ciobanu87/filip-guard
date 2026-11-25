@@ -50,3 +50,18 @@ proof volume. Persist the host volume itself and separately retain encryption ke
 and trusted recovery receipts. Verified encrypted WordPress **content** recovery
 is not a full WordPress/site or application-state backup. An authorized host-level
 quiesced encrypted application-volume recovery drill remains a launch gate.
+
+## Missing state at runtime
+
+The account UI, monitoring configuration and integrated test workspace now require
+existing private SQLite state before opening service constructors. A missing
+monitor database is a recovery incident, not permission to create an empty history
+or outbox. Missing/corrupt account storage disables sign-in and clears customer UI
+state while the public Scanner stays available. No registration flag is enabled.
+
+`operations_guard_setup.py --initialize-read-only` is for first provisioning of all
+three stores together. A repeat invocation accepts complete valid existing state;
+a partial set is rejected before recreating any missing database. Restore that set
+using the existing encrypted recovery procedure. The restore-review hold remains
+mandatory. These runtime checks do not prove a host volume is durable or provision
+a cloud host. The Groq usage ledger is separate and is never changed by this check.

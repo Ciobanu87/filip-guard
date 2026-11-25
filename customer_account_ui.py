@@ -1,6 +1,7 @@
 """Customer account UI; no WordPress login or live repair controls are enabled."""
 import os
 from customer_auth import CustomerAuth, AuthenticationError
+from runtime_state import require_existing_database, AUTH_TABLES
 
 
 def _clear_customer_state(ui):
@@ -16,7 +17,14 @@ def render_customer_account(st_module=None, *, auth=None, allow_registration=Non
     if auth is None:
         database = os.environ.get('FG_CUSTOMER_AUTH_DB')
         if database:
-            auth = CustomerAuth(database)
+            try:
+                require_existing_database(database, AUTH_TABLES)
+                auth = CustomerAuth(database)
+            except (ValueError, OSError):
+                _clear_customer_state(ui)
+                with ui.expander('Customer account', expanded=False):
+                    ui.warning('Private account storage is unavailable. Sign-in remains disabled until existing state is restored.')
+                return None
     if allow_registration is None:
         allow_registration = os.environ.get('FG_CUSTOMER_REGISTRATION') == '1'
     with ui.expander('Customer account', expanded=False):

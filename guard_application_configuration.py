@@ -13,6 +13,7 @@ from guard_application import GuardApplication
 from monitoring_service import MonitoringService
 from guard_assets import GuardAssetDirectory
 from wordpress_rest_gateway import WordPressRESTGateway
+from runtime_state import require_existing_guard_state
 
 
 def configured_guard_application():
@@ -28,6 +29,7 @@ def configured_guard_application():
     from urllib.parse import urlsplit
     if any(type(origin) is not str or not urlsplit('https://'+_origin(origin)).hostname.endswith('.test') for origin in origins):
         raise ValueError('Only isolated .test sites may be enabled')
+    require_existing_guard_state()  # Validate all state before secrets or constructors.
     key_id=os.environ.get('FG_GUARD_KEY_ID','test-v1')
     master_keys=configured_master_keys()
     store=configured_external_store()

@@ -11,6 +11,7 @@ from customer_auth import CustomerAuth
 from customer_sites import CustomerSites
 from guard_assets import GuardAssetDirectory
 from monitoring_service import MonitoringService
+from runtime_state import require_existing_guard_state
 
 
 def initialize_read_only(environ=None):
@@ -18,6 +19,11 @@ def initialize_read_only(environ=None):
     auth_path=Path(env['FG_CUSTOMER_AUTH_DB']);root=Path(env['FG_CUSTOMER_DATA_ROOT']);monitor_path=Path(env['FG_MONITOR_DB'])
     if root.is_symlink() or (root.exists() and not (root/'sites.sqlite').is_file() and any(root.iterdir())):
         raise ValueError('Nonempty or ambiguous site state cannot be initialized')
+    existing=[path.exists() or path.is_symlink() for path in (auth_path,root/'sites.sqlite',monitor_path)]
+    if any(existing):
+        if not all(existing):
+            raise ValueError('Partial application state must be recovered, not initialized')
+        require_existing_guard_state(env)
     auth=CustomerAuth(auth_path);directory=CustomerSites(auth,root,None)
     MonitoringService(GuardAssetDirectory(directory),monitor_path)
     return {'status':'initialized','scope':'read-only-monitoring','accounts_created':0,
