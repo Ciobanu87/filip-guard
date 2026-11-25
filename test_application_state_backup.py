@@ -153,5 +153,45 @@ class ApplicationStateTests(unittest.TestCase):
             self.assertEqual(main(['recover', '--authorized-external-access', '--manifest', str(receipt), '--destination', str(self.root/'recovered')]), 0)
         self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
 
+    def test_integrated_recovery_keeps_two_customers_monitoring_notifications_and_ai_reservations(self):
+        import test_monitoring_service as monitoring_fixture
+        import test_contextual_advisor as advisor_fixture
+        from customer_sites import CustomerSites
+        from contextual_advisor import ContextualAdvisor
+        from monitoring_service import MonitoringService
+        fixture = monitoring_fixture.MonitoringServiceTests(); fixture.setUp()
+        self.addCleanup(fixture.doCleanups)
+        source = Path(fixture.auth.path).parent
+        fixture.enable(); fixture.enable(fixture.b, fixture.site_b)
+        fixture.monitor.run_once(now=100); fixture.monitor.run_once(now=100)
+        provider = advisor_fixture.SimulatedProvider()
+        engine = ContextualAdvisor(source/'advisor.sqlite', provider, daily_calls=1, clock=lambda:100)
+        original = engine.analyze(advisor_fixture.ROWS, advisor_fixture.CONTEXT, scope=advisor_fixture.SCOPE)
+        self.assertEqual(original['status'], 'model-assisted'); self.assertEqual(provider.calls, 1)
+        receipt = state.export_application_state(source, self.store, self.keys,
+            deployment_id=self.did, key_id='v1', quiesced=True)
+        destination = self.root/'integrated-recovery'
+        state.recover_application_state(self.store, self.keys, receipt, destination)
+        with self.assertRaises(ValueError): CustomerAuth(destination/'auth.sqlite')
+        # Only this synthetic drill acknowledges review; live recovery never resumes itself.
+        (destination/state.REVIEW_MARKER).unlink()
+        auth = CustomerAuth(destination/'auth.sqlite')
+        alice = auth.login('alice', 'Alice-monitor-password', now=101)
+        bob = auth.login('bob', 'Bob-monitor-password', now=101)
+        sites = CustomerSites(auth, destination/'sites', None)
+        scanner = monitoring_fixture.FixtureScanner()
+        monitor = MonitoringService(sites, destination/'monitor.sqlite', scanner=scanner)
+        self.assertEqual(len(monitor.history(alice, fixture.site_a, now=101)), 1)
+        self.assertEqual(len(monitor.notifications(alice, now=101)), 1)
+        self.assertEqual(len(monitor.history(bob, fixture.site_b, now=101)), 1)
+        with self.assertRaises(PermissionError): monitor.history(bob, fixture.site_a, now=101)
+        self.assertEqual(monitor.run_once(now=101)['status'], 'idle')
+        self.assertEqual(scanner.calls, [])
+        fresh_provider = advisor_fixture.SimulatedProvider()
+        recovered = ContextualAdvisor(destination/'advisor.sqlite', fresh_provider, daily_calls=1, clock=lambda:101)
+        self.assertEqual(recovered.analyze(advisor_fixture.ROWS, advisor_fixture.CONTEXT, scope=advisor_fixture.SCOPE), original)
+        self.assertEqual(recovered.analyze(advisor_fixture.ROWS, advisor_fixture.CONTEXT, scope='c'*32+':'+'d'*32)['status'], 'daily-limit')
+        self.assertEqual(fresh_provider.calls, 0)
+
 
 if __name__ == '__main__': unittest.main()

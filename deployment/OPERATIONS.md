@@ -48,7 +48,10 @@ archive of WordPress content is not a backup of the accounts, journals, receipts
 schedules, notifications, WordPress installation or full database. For a complete
 application recovery drill, quiesce UI/workers before a consistent encrypted
 volume snapshot, restore it on an isolated host, then reconcile uncertain writes
-before resuming. This host-level recovery remains unvalidated.
+before resuming. `APPLICATION_STATE_RECOVERY.md` documents the stopped-writer
+encrypted SQLite-state export/readback/recovery tool and its mandatory resume
+block. Offline and isolated real-S3 drills cover that tool; a deployed host-level
+recovery with actual independent key custody remains unvalidated.
 
 `guard-test.service.example`, `monitoring-paths.env.example`,
 `test-workspace.env.example`, `email-worker.conf.example` and the existing
