@@ -82,6 +82,7 @@ class GroqProviderTests(unittest.TestCase):
             keyfile=Path(root)/'key';keyfile.write_text(KEY);keyfile.chmod(0o600)
             env={'FG_AI_AUTHORIZED':'1','FG_AI_PROVIDER':'groq-free','FG_GROQ_API_KEY_FILE':str(keyfile),
                  'FG_AI_FREE_PLAN_CONFIRMED':'1','FG_AI_CLOUD_DATA_CONSENT':'1','FG_AI_LEDGER_DB':str(Path(root)/'ledger.sqlite')}
+            ContextualAdvisor(env['FG_AI_LEDGER_DB'],self.provider())  # Explicit provisioning, not runtime recovery.
             with patch.dict(os.environ,env,clear=True),patch('advisor_groq.cloud_exchange') as network:
                 engine=configured_advisor();self.assertEqual(engine.provider.name,'groq-free');network.assert_not_called()
     def test_oversized_cloud_context_is_blocked_before_key_access_or_network(self):

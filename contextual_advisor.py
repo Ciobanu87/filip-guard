@@ -221,6 +221,17 @@ def configured_advisor():
             model=os.environ.get('FG_AI_MODEL',MODEL),free_plan_confirmed=os.environ.get('FG_AI_FREE_PLAN_CONFIRMED')=='1',
             data_consent=os.environ.get('FG_AI_CLOUD_DATA_CONSENT')=='1')
     else:raise ValueError('Unreviewed model provider')
+    # Runtime configuration must never recreate a lost budget as a fresh ledger.
+    # Explicit development provisioning still uses ContextualAdvisor directly.
+    from pathlib import Path
+    ledger=Path(os.environ['FG_AI_LEDGER_DB'])
+    if ledger.is_symlink() or not ledger.is_file():
+        raise ValueError('AI usage ledger missing; restore/reconcile history before enabling inference')
+    try:
+        with sqlite3.connect(ledger.resolve().as_uri()+'?mode=ro',uri=True) as db:
+            db.execute('SELECT scope,request_hash,started,expires,day,state,result FROM advisor_requests LIMIT 0')
+    except sqlite3.Error:
+        raise ValueError('AI usage ledger invalid; no automatic budget initialization') from None
     daily=int(os.environ.get('FG_AI_DAILY_CALLS','20'))
     if kind=='groq-free' and daily>20:raise ValueError('Cloud free-test daily limit cannot exceed 20')
     return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,daily_calls=daily)
