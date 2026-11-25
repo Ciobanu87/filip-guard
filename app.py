@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from ai_advisor import analyze_pages, suggest_meta_description
 from contextual_advisor import rule_result
 from contextual_advisor_ui import render_advice
+from public_scan_advisor import render_public_scan_advice
 from website_scanner import HEADERS, MAX_BYTES, public_host, validate_url, fetch, normalize_link, scan
 from link_resolver import suggest_replacements
 from wordpress_autofix_ui import render_wordpress_autofix_ui
@@ -136,8 +137,7 @@ if result is not None:
     st.download_button('Download page audit CSV', to_csv(rows), 'filip_guard_pages.csv', 'text/csv')
     st.subheader('Internal link issues')
     st.subheader('AI Advisor - SEO Recommendations')
-    st.caption('Public demo uses deterministic rules. Optional model analysis is available only for an authenticated authorized site.')
-    render_advice(st,rule_result(rows,result.get('contexts',{})))
+    render_public_scan_advice(st,result)
     if broken:
         st.dataframe(broken, use_container_width=True, hide_index=True)
         st.download_button('Download link issues CSV', to_csv(broken), 'filip_guard_links.csv', 'text/csv')
