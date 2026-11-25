@@ -1,0 +1,32 @@
+name: Authorized B2 synthetic recovery
+on:
+  push:
+    branches: [filip-guard-development]
+    paths: [deployment/b2-validation-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: filip-guard-b2-synthetic-recovery
+  cancel-in-progress: false
+jobs:
+  verify-b2:
+    if: github.repository == 'Ciobanu87/filip-guard' && github.ref == 'refs/heads/filip-guard-development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing application dependencies without provider credentials
+        run: python -m pip install -q -r requirements.txt
+      - name: Verify bounded encrypted B2 upload and independent synthetic recovery
+        env:
+          FG_B2_VALIDATE_AUTHORIZED: '1'
+          FG_B2_KEY_ID: ${{ secrets.FG_B2_KEY_ID }}
+          FG_B2_APPLICATION_KEY: ${{ secrets.FG_B2_APPLICATION_KEY }}
+          FG_B2_BUCKET: ${{ secrets.FG_B2_BUCKET }}
+          FG_B2_ENDPOINT: ${{ secrets.FG_B2_ENDPOINT }}
+        run: python operations_b2_probe.py run
