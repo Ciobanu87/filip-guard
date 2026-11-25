@@ -19,8 +19,12 @@ from runtime_state import require_existing_guard_state
 def configured_guard_application():
     if os.environ.get('FG_GUARD_TEST_UI')!='1':return None
     names=('FG_CUSTOMER_AUTH_DB','FG_CUSTOMER_DATA_ROOT','FG_MONITOR_DB','FG_GUARD_TEST_ORIGINS',
-           'FG_GUARD_S3_CREDENTIALS_FILE','FG_GUARD_S3_ENDPOINT','FG_GUARD_S3_BUCKET')
+           )
     if not all(os.environ.get(name) for name in names):return None
+    source=os.environ.get('FG_GUARD_S3_SECRET_SOURCE','file')
+    if source=='file' and not all(os.environ.get(name) for name in
+        ('FG_GUARD_S3_CREDENTIALS_FILE','FG_GUARD_S3_ENDPOINT','FG_GUARD_S3_BUCKET')):return None
+    if source not in ('file','streamlit'):raise ValueError('Unreviewed backup secret source')
     if not (os.environ.get('FG_GUARD_KEY_DIRECTORY') or os.environ.get('FG_GUARD_MASTER_KEY_FILE')):return None
     origins=json.loads(os.environ['FG_GUARD_TEST_ORIGINS'])
     if type(origins) is not list or not origins:raise ValueError('Explicit isolated test sites required')
