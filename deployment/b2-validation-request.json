@@ -1,0 +1,8 @@
+{
+  "schema": "filip-guard-synthetic-b2-request-v1",
+  "request_id": "b2-synthetic-recovery-20261125-01",
+  "scope": "synthetic-only",
+  "authorized_by_owner": true,
+  "groq_calls": 0,
+  "production_backup": false
+}
