@@ -22,6 +22,43 @@ merge, AI call or production-key generation is performed by these files.
 - Existing B2 synthetic encrypt/upload/download/recovery and Groq 9/9 acceptance
   remain prior completed evidence. They were not repeated by these workflows.
 
+## Additional owner evidence accepted on 2026-11-26
+
+`owner-evidence-20261126.json` records the six supplied screenshots by SHA-256
+and stores only nonsecret reviewed facts. Original screenshots, subscription IDs
+and OCIDs are not committed. The owner confirms no paid upgrade; the screenshots
+show a Free Tier account with the trial active, the same Frankfurt A1 allocation,
+an explicitly Always Free 47 GB boot volume, Balanced 10 VPU/GB, no performance
+auto-tuning, no cross-region replication and no scheduled boot backup policy.
+Do not ask the owner to provide those same detail pages again.
+
+The usage view displays zero RON consumption/overage AND no usage data, zero SKUs
+and zero regions for the selected current-day range. Preserve that distinction:
+it is not a populated account-wide zero-cost audit. Oracle documents delayed
+reporting; do not replace unknown aggregate usage with zero. Conversely, do not
+require a later billing screenshot if a complete resource/usage inventory and
+conservative full-month projection independently establish free eligibility.
+
+The Always Free volume label in Frankfurt also supports home-region eligibility
+for that volume under Oracle's documented rule; the separate explicit home-region
+field has not been seen. The outstanding scope is account-wide A1 allocation/use,
+all allocated boot/block volumes (including detached ones), and backup counts
+across relevant compartments/regions. Do not silently substitute this single
+volume's 47 GB for an aggregate total.
+
+`operations_oracle_account_access.py` adds a fixed pinned read-only check using
+only an ALREADY installed OCI SDK/CLI and the instance's EXISTING identity. It
+never installs tooling, reads user API-key config, creates a dynamic group or
+changes IAM. Missing tooling, failed existing authorization or an incomplete
+region response remains an explicit blocker. A successful region read alone
+still does not claim cumulative usage or full resource visibility.
+
+Official references checked for this evidence review:
+- https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
+- https://docs.oracle.com/en-us/iaas/Content/Billing/Concepts/costanalysisoverview.htm
+- https://docs.oracle.com/en-us/iaas/Content/Billing/Concepts/costusagereportsoverview.htm
+- https://docs.oracle.com/en-us/iaas/tools/python/latest/api/signing.html
+
 ## Prepared file layout
 
 | Path on existing host | Purpose / owner |

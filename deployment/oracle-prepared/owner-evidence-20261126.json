@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "reviewed_on": "2026-11-26",
+  "source": "owner-statement-and-six-attached-Oracle-console-screenshots",
+  "attachment_sha256": [
+    "fe1e21d40f279a64ae7ceb96544dadac4319ddffd0484c09a44e3df25f90a0d3",
+    "59f35912d03ee319503279a2fe989dc08d15b1506e7521e1cfd31b66f61e8bac",
+    "35a228c3af5146e3da7a62331c11aa1ba76c500e1f1815c9d1376b2f655acfe7",
+    "94525392675a9da4a0afaa728b499c64c67720da94b0503429d62c86ddbd7379",
+    "e89565945bfe0d936cda4affdf43ec1e3d30af9f3210c0148dc01840ee75d0fa",
+    "a588bd1d6fc5524a9e704c30564e2b2d36bb99e3409696308e5edf1ea7314859"
+  ],
+  "confirmed": {
+    "owner_reports_no_paid_upgrade": true,
+    "free_tier_banner_visible": true,
+    "free_trial_banner_visible": true,
+    "instance_region": "eu-frankfurt-1",
+    "shape": "VM.Standard.A1.Flex",
+    "ocpus": 1,
+    "memory_gib": 6,
+    "image": "Oracle-Linux-9.8-aarch64-2026.11.20-0",
+    "boot_volume_gb": 47,
+    "boot_volume_always_free_label_visible": true,
+    "boot_performance_vpu_per_gb": 10,
+    "boot_auto_tuning_enabled": false,
+    "boot_cross_region_replication_enabled": false,
+    "boot_scheduled_backup_policy": "None",
+    "consumption_displayed_ron": 0,
+    "overage_displayed_ron": 0,
+    "usage_page_has_no_usage_data": true,
+    "usage_page_shows_zero_skus_and_regions": true
+  },
+  "unverified": {
+    "explicit_home_region": null,
+    "all_compartment_and_region_resource_inventory": null,
+    "aggregate_a1_ocpu_hours": null,
+    "aggregate_a1_memory_gib_hours": null,
+    "aggregate_boot_block_gib": null,
+    "aggregate_volume_backups": null,
+    "populated_cumulative_usage_report": null
+  },
+  "installation_authorized_by_this_record": false,
+  "always_free_account_audit_complete": false,
+  "notes": [
+    "Current-day no-data display is retained as evidence, not converted into verified cumulative zero usage.",
+    "Individual Always Free boot volume evidence is accepted and must not be requested again.",
+    "No subscription IDs, OCIDs, private keys, credentials or original screenshots are stored in the repository."
+  ]
+}

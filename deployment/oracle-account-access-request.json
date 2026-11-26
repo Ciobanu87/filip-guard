@@ -1,0 +1,8 @@
+{
+  "authorized": true,
+  "requested_on": "2026-11-26",
+  "scope": "existing-oci-tooling-and-existing-identity-read-only",
+  "install_or_activate": false,
+  "iam_changes": false,
+  "groq_calls": 0
+}
