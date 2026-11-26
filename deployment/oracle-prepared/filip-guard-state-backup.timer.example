@@ -1,0 +1,12 @@
+# PREPARED ONLY. No catch-up backup on reboot; reviewed quota is never refunded.
+[Unit]
+Description=FILIP GUARD daily verified encrypted state backup
+ConditionPathExists=/etc/filip-guard/host-approval.json
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+RandomizedDelaySec=10min
+AccuracySec=1min
+Persistent=false
+Unit=filip-guard-state-backup.service
+[Install]
+WantedBy=timers.target

@@ -1,5 +1,14 @@
 # Authorized infrastructure setup — not deployed
 
+Current host preparation/status (2026-11-26): see
+[`oracle-prepared/README.md`](oracle-prepared/README.md). The earlier real B2
+synthetic encrypted recovery succeeded and is not repeated here. Pinned Oracle
+SSH and a read-only readiness inventory also succeeded. Permanent host
+installation, host-level recovery/key custody and account-level zero-cost
+verification remain pending; the new units/timer are prepared only. Historical
+"not configured/validated" statements below describe the original preparation,
+not a reversal of those completed B2 checks.
+
 All code stays on `filip-guard-development`. Production AutoFix remains blocked.
 This runbook configures existing components; it does not provision accounts,
 activate subscriptions, send mail, install services or generate production keys.

@@ -1,0 +1,29 @@
+# PREPARED ONLY. No OnFailure email command or provider resource is activated.
+[Unit]
+Description=FILIP GUARD quiesced encrypted state backup and recovery verification
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/filip-guard/host-approval.json
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/filip-guard
+EnvironmentFile=/etc/filip-guard/runtime.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecCondition=/opt/filip-guard/.venv/bin/python /opt/filip-guard/operations_host_gate.py
+ExecStart=/opt/filip-guard/.venv/bin/python operations_scheduled_state_backup.py --execute
+TimeoutStartSec=10min
+UMask=0077
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_DAC_OVERRIDE CAP_KILL
+RestrictSUIDSGID=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadWritePaths=/srv/filip-guard/state /srv/filip-guard/recovery /etc/filip-guard /run
+# Root controls only the fixed UI/worker units; runuser drops privileges for export.
+# A killed controller/host crash requires review before further activation.

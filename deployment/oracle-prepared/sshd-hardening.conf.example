@@ -1,0 +1,7 @@
+# PREPARED ONLY. Must be validated with sshd -t and effective sshd -T before reload.
+# Install early enough in the include order to take precedence. Never replace
+# authorized_keys or remove the current opc key. Preserve out-of-band recovery.
+PermitRootLogin no
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
