@@ -7,7 +7,7 @@ import shlex
 import subprocess
 
 from operations_oracle_bootstrap import validate_authorization
-from operations_oracle_ssh_probe import run_pinned_command
+from operations_oracle_ssh_probe import run_pinned_command, HostSetupError
 
 ROOT = Path(__file__).parent
 BASELINE = 'a4fa538af200a78896faef1ab7d2143a95309e8d'
@@ -15,6 +15,13 @@ BASELINE = 'a4fa538af200a78896faef1ab7d2143a95309e8d'
 
 def main():
     try:
+        request_scope = json.loads((ROOT / 'deployment/oracle-operations-readiness-request.json').read_text())
+        expected_scope = {'authorized': True, 'requested_on': '2026-11-26',
+                          'scope': 'inactive-unit-preparation-and-isolated-native-host-stability',
+                          'systemd_service_activation': False, 'provider_requests': 0,
+                          'master_key_operations': False, 'groq_calls': 0}
+        if request_scope != expected_scope or any(type(request_scope[k]) is not type(v) for k, v in expected_scope.items()):
+            raise ValueError('Explicit held-runtime-only request required')
         evidence = (ROOT / 'deployment/oracle-prepared/owner-evidence-20261126.json').read_bytes()
         approved = validate_authorization(json.loads((ROOT / 'deployment/oracle-host-setup-request.json').read_text()), evidence, os.environ)
         names = ('filip-guard-ui.service', 'filip-guard-worker.service')
@@ -29,6 +36,9 @@ def main():
             raise ValueError('Host readiness not verified')
         if any(response.get(key) != 0 for key in ('groq_calls', 'provider_requests', 'master_key_operations')) or response.get('services_enabled') is not False:
             raise ValueError('Unexpected provider/service operation')
+    except HostSetupError as exc:
+        print(json.dumps({'status': 'operations-readiness-blocked-or-failed', 'remote_phase': exc.phase,
+                          'services_enabled': False, 'groq_calls': 0})); return 1
     except Exception:
         print('{"status":"operations-readiness-blocked-or-failed","services_enabled":false,"groq_calls":0}'); return 1
     print(json.dumps(response, sort_keys=True)); return 0

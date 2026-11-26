@@ -56,9 +56,10 @@ SQLite ledger was found in the existing FILIP GUARD workspaces during this step.
 - `/srv` currently uses XFS: 29 GiB filesystem total / 19 GiB available.
   These are guest filesystem figures, NOT the OCI boot-volume size, storage pool,
   allocation/performance tier or account bill. No resize/repartition is proposed.
-- SELinux enforcing and firewalld active. Password SSH authentication disabled;
-  public-key authentication enabled; root policy `without-password` permits keys.
-  Do not describe this as root login completely disabled.
+- At the initial inventory, SELinux/firewalld were active and root SSH policy
+  was `without-password`. The completed hardening above supersedes that policy:
+  effective root login is now disabled, with a separate pinned `opc` connection
+  verified before the controlled reboot.
 - Before installation, Python 3.11, Docker and Podman were absent and the guard
   state directory was absent. The completed host work above supersedes that snapshot.
 - Existing B2 synthetic encrypt/upload/download/recovery and Groq 9/9 acceptance
@@ -270,3 +271,49 @@ re-enable AI without reconciling current provider usage.
 The runtime source/units are installed on the existing server, but application
 services/timer remain disabled pending the remaining state/custody gates. Never
 request passwords, provider keys or master-key values in chat.
+
+
+## Deferred owner actions and safe preparation boundary
+
+On 2026-11-26 the owner explicitly deferred Groq/Backblaze sign-ins and custody
+steps requiring owner participation. Do not reopen those sign-ins or generate,
+export, rotate or place the production master key as part of the held-runtime
+preparation. No plaintext master key may be saved in ChatGPT Library.
+
+`oracle-operations-readiness.yml` prepares only the two fixed **inactive** UI
+and worker units (private writable cache/HOME and a three-failures-per-five-minute
+restart ceiling). It preserves the host approval/ExecCondition gates, nonroot
+identity, loopback UI, capabilities removal, SELinux/firewall and private state.
+It neither reinstalls application dependencies nor changes the installed source
+snapshot. An unexpected installed-unit hash blocks replacement; verification
+failure restores both prior unit files before reloading systemd.
+
+The native drill uses disposable accounts/sites/history/notifications below the
+private cache, never the production state directory. It checks separate-process
+reopening, six competing process claims, expired-lease fencing, SQLite WAL
+recovery after SIGKILL, two idle-worker heartbeats and clean SIGTERM shutdown,
+tenant denial, restore holds and missing-state refusal. The actual worker entry
+point is a temporary fixture process with every schedule disabled; systemd
+services remain stopped. Networking is blocked by the fixture audit hook and
+provider secrets are absent. Temporary fixtures/processes are removed. The
+controller additionally checks the unchanged original state and disabled units
+before/after and requires the real activation gate still to refuse activation.
+
+The root-only `/etc/filip-guard/operations-readiness-receipt.json` contains
+sanitized boolean results and the harness source SHA-256, never fixture session
+tokens, credentials or customer data. This short controlled drill is operational
+preparation, not evidence of uninterrupted production operation.
+
+When the owner resumes the deferred actions, the remaining sequence is:
+
+1. Recover/reconcile exact historical Groq reservations and usage without new
+   inference or inventing remaining budget. Preserve the nine accepted reports.
+2. Verify actual B2 account free allowance, zero-spend caps, current storage
+   headroom and absence of chargeable event-notification configuration.
+3. Establish owner-controlled encrypted independent key custody with the
+   decryption secret separate, then verify recovery without exposing the key.
+4. Resume the existing activation/recovery sequence above: reconcile required
+   persistent state, issue fresh complete host approval, run one bounded backup
+   and independent recovery drill, then authorize the UI/worker and backup timer
+   in the prescribed order. Public ingress, live email and repairs retain their
+   separate existing checks and consent; this drill grants none of them.
