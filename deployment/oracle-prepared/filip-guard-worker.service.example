@@ -3,6 +3,8 @@
 Description=FILIP GUARD development monitoring worker
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
 ConditionPathExists=/etc/filip-guard/host-approval.json
 [Service]
 Type=simple
@@ -11,6 +13,7 @@ Group=filipguard
 WorkingDirectory=/opt/filip-guard
 EnvironmentFile=/etc/filip-guard/runtime.env
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=HOME=/var/cache/filip-guard
 ExecCondition=/opt/filip-guard/.venv/bin/python /opt/filip-guard/operations_host_gate.py
 ExecStart=/opt/filip-guard/.venv/bin/python monitoring_worker.py --poll-seconds 30 --max-jobs 5
 Restart=on-failure
@@ -28,7 +31,7 @@ ProtectControlGroups=true
 RestrictSUIDSGID=true
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 CapabilityBoundingSet=
-ReadWritePaths=/srv/filip-guard/state
+ReadWritePaths=/srv/filip-guard/state /var/cache/filip-guard
 MemoryMax=512M
 [Install]
 WantedBy=multi-user.target

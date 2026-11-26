@@ -141,3 +141,24 @@ jobs:
         run: docker build -f deployment/Dockerfile -t filip-guard-ci:proof .
       - name: Verify Streamlit restart, private persistent state and separate worker
         run: python tests/real_infrastructure/container_restart.py
+
+  isolated-host-operations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install existing application dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify process isolation, crash recovery and idle worker shutdown on disposable state
+        env:
+          FG_DISPOSABLE_HOST_VALIDATION: '1'
+          FG_VALIDATION_CODE_ROOT: ${{ github.workspace }}
+          FG_AI_AUTHORIZED: '0'
+          FG_EMAIL_AUTHORIZED: '0'
+          FG_STATE_BACKUP_AUTHORIZED: '0'
+        run: python tests/host_operations/readiness.py
