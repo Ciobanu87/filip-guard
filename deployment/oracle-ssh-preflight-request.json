@@ -1,0 +1,8 @@
+{
+  "authorized": true,
+  "scope": "existing-vm-pinned-read-only-ssh",
+  "requested_on": "2026-11-26",
+  "server_mutation": false,
+  "paid_resources": false,
+  "groq_calls": 0
+}
