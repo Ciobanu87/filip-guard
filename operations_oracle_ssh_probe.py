@@ -49,7 +49,7 @@ def pinned_known_host(host, expected_fingerprint, scan):
     return str(address)+' ssh-ed25519 '+next(iter(keys))+'\n'
 
 
-def run_probe(env=None,runner=None):
+def run_pinned_command(remote_command,env=None,runner=None):
     env=os.environ if env is None else env;runner=subprocess.run if runner is None else runner
     if env.get('FG_OCI_SSH_PROBE_AUTHORIZED')!='1':raise ValueError('Explicit read-only SSH authorization required')
     host=env['FG_OCI_HOST'];expected=env['FG_OCI_HOST_ED25519_SHA256'];private=env['FG_OCI_SSH_PRIVATE_KEY']
@@ -70,15 +70,19 @@ def run_probe(env=None,runner=None):
             '-o','UserKnownHostsFile='+str(hosts),'-o','GlobalKnownHostsFile=/dev/null',
             '-o','PasswordAuthentication=no','-o','KbdInteractiveAuthentication=no',
             '-o','ConnectTimeout=10','-o','ConnectionAttempts=1','-o','LogLevel=ERROR',
-            'opc@'+host,REMOTE_COMMAND]
+            'opc@'+host,remote_command]
         result=runner(command,capture_output=True,text=True,timeout=40,check=False,env=child_env)
         if result.returncode!=0:raise ConnectionError('Pinned SSH authentication or read-only check failed')
         if len(result.stdout)>4096:raise ValueError('Unexpected remote response')
-        checks=json.loads(result.stdout)
-        allowed={'arm64','sudo_read_check_available','password_authentication_disabled',
-                 'public_key_authentication_enabled','root_login_disabled'}
-        if type(checks) is not dict or set(checks)!=allowed or any(type(x) is not bool for x in checks.values()):
-            raise ValueError('Invalid read-only check')
+        return result.stdout
+
+
+def run_probe(env=None,runner=None):
+    checks=json.loads(run_pinned_command(REMOTE_COMMAND,env,runner))
+    allowed={'arm64','sudo_read_check_available','password_authentication_disabled',
+             'public_key_authentication_enabled','root_login_disabled'}
+    if type(checks) is not dict or set(checks)!=allowed or any(type(x) is not bool for x in checks.values()):
+        raise ValueError('Invalid read-only check')
     return {'status':'authenticated-read-only','host_identity_verified':True,**checks,
         'server_modified':False,'always_free_billing_verified':False,'groq_calls':0}
 
