@@ -1,8 +1,50 @@
-# Existing Oracle host: prepared, NOT installed or activated
+# Existing Oracle host: runtime installed; application services held inactive
 
 Scope: `Ciobanu87/filip-guard`, `filip-guard-development` only. No resource
 provisioning, new VM/volume, public listener, subscription, paid service, production
 merge, AI call or production-key generation is performed by these files.
+
+## Current completed host work — 2026-11-26
+
+The owner explicitly confirmed only this VM, its 47 GB boot volume and required
+networking were created, with no other instances, volumes, volume backups or
+additional cloud services. Combined with the accepted screenshots and existing
+identity home-region read, this closes the Oracle inventory clarification.
+The full 31-day projection is at most 744 OCPU-hours / 4,464 GiB-hours for this
+unchanged 1 OCPU / 6 GB allocation; this is a conservative allocation projection,
+not a fabricated populated billing report. No cloud resource/shape/storage size
+was changed.
+
+Actual installation snapshot:
+`4c729591d831188c7b6cfa4119c929ba0bfe4e20` on the development branch.
+Actions https://github.com/Ciobanu87/filip-guard/actions/runs/45833280508 verified:
+Python 3.11, isolated venv/dependencies, dedicated nonroot account, private
+persistent directories, installed but disabled UI/worker/backup units, actual
+public Scanner UI rendering and temporary loopback health. Existing application
+state remained unchanged; accounts/AI ledger were not initialized. System Python
+was not replaced. No external backup or inference call occurred.
+
+Security orchestration snapshot:
+`e1533e7c9ac555cac00c73bfebbbad5385769550`.
+Actions https://github.com/Ciobanu87/filip-guard/actions/runs/45834496272 verified:
+root SSH login disabled, password/interactive authentication disabled, a new
+independent pinned `opc` connection, cancelled timed rollback, actual controlled
+host reboot, durable proof survival, unchanged state, SELinux enforcing and
+firewalld active. No additional reboot is needed to repeat this completed proof.
+
+`operations_oracle_b2_mount.py` now configures only existing repository-secret
+B2 values via pinned encrypted SSH stdin, root-controlled private storage and a
+0400 application-readable credential file. It constructs the existing adapter
+as the app user without a network request, new key or upload. It refuses to
+replace different existing credentials/settings. The backup authorization flag
+and timer remain off; configuration is not a fresh B2 recovery test.
+
+The deployed full UI/worker gate is still held. Original AI usage SQLite state,
+application master-key custody, independent host-level recovery and current B2
+zero-spend/headroom evidence are not fabricated by this infrastructure setup.
+The earlier Colab ledger-loss limitation in `../GROQ_REPORT_RECOVERY.md` remains
+in force: reports/9 accepted cases are not a replacement ledger. No local original
+SQLite ledger was found in the existing FILIP GUARD workspaces during this step.
 
 ## Evidence already obtained
 
@@ -17,8 +59,8 @@ merge, AI call or production-key generation is performed by these files.
 - SELinux enforcing and firewalld active. Password SSH authentication disabled;
   public-key authentication enabled; root policy `without-password` permits keys.
   Do not describe this as root login completely disabled.
-- Python 3.11, Docker and Podman are absent. The guard state directory is absent;
-  neither named guard service is active. Their existence/loading was not proved.
+- Before installation, Python 3.11, Docker and Podman were absent and the guard
+  state directory was absent. The completed host work above supersedes that snapshot.
 - Existing B2 synthetic encrypt/upload/download/recovery and Groq 9/9 acceptance
   remain prior completed evidence. They were not repeated by these workflows.
 
@@ -115,10 +157,12 @@ must be recovered/reconciled; the gate never initializes them. All global
 AI/email/registration/test/backup flags in `runtime.env.example` remain off.
 There is no deployment/installation workflow and no scheduled SSH workflow.
 
-## Later execution sequence — blocked until real zero-cost verification
+## Operational sequence — completed host steps above; remaining activation gates below
 
 These are implementation instructions for the agent, not commands the owner
-needs to type on a phone. None have been executed on the Oracle host.
+needs to type on a phone. The host installation, SSH hardening and reboot portions
+are now completed as recorded above; do not repeat them. State recovery, production
+key custody, full runtime activation and automatic backup remain held.
 
 1. Retain account-level evidence and record its hash, time and expiry in the
    approval; distinguish infrastructure installation permission from later
@@ -215,11 +259,14 @@ re-enable AI without reconciling current provider usage.
 
 ## Current remaining external gates
 
-- Actual Oracle account/resource/usage evidence for all zero-cost conditions.
+- Oracle eligibility for the unchanged existing host is now accepted from the
+  combined screenshots, owner inventory confirmation and home-region API evidence;
+  do not request the same clarification or repeat the denied account API reads.
 - Existing private state/AI ledger, deployment identifier and independently
   retained keys/receipts transferred safely after infrastructure authorization.
-- Real host installation, reboot validation, recovery/custody drill, first timed
-  backup and real email delivery validation; none are claimed complete here.
+- Host installation/reboot validation are complete. The recovery/custody drill,
+  first timed backup and real email delivery validation remain incomplete.
 
-The code and units are prepared and tested locally/CI; they are not installed
-on the server. No request for passwords/keys in chat is necessary.
+The runtime source/units are installed on the existing server, but application
+services/timer remain disabled pending the remaining state/custody gates. Never
+request passwords, provider keys or master-key values in chat.

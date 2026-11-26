@@ -1,0 +1,34 @@
+name: Authorized existing B2 credentials host mount only
+on:
+  push:
+    branches: [filip-guard-development]
+    paths: [deployment/oracle-b2-mount-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: filip-guard-oracle-host-configuration
+  cancel-in-progress: false
+jobs:
+  setup-existing-host:
+    if: github.repository == 'Ciobanu87/filip-guard' && github.ref == 'refs/heads/filip-guard-development'
+    environment: filip-guard-oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Mount existing B2 credentials privately without network requests or activation
+        env:
+          FG_OCI_HOST_SETUP_AUTHORIZED: '1'
+          FG_OCI_HOST: ${{ secrets.FG_OCI_HOST }}
+          FG_OCI_HOST_ED25519_SHA256: ${{ secrets.FG_OCI_HOST_ED25519_SHA256 }}
+          FG_OCI_SSH_PRIVATE_KEY: ${{ secrets.FG_OCI_SSH_PRIVATE_KEY }}
+          FG_B2_KEY_ID: ${{ secrets.FG_B2_KEY_ID }}
+          FG_B2_APPLICATION_KEY: ${{ secrets.FG_B2_APPLICATION_KEY }}
+          FG_B2_BUCKET: ${{ secrets.FG_B2_BUCKET }}
+          FG_B2_ENDPOINT: ${{ secrets.FG_B2_ENDPOINT }}
+        run: python operations_oracle_b2_mount.py
