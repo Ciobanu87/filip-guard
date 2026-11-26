@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "scope": "existing-oracle-host-os-and-private-runtime-preparation",
+  "host": "92.5.89.125",
+  "region": "eu-frankfurt-1",
+  "shape": "VM.Standard.A1.Flex",
+  "ocpus": 1,
+  "memory_gib": 6,
+  "boot_gb": 47,
+  "owner_confirmed_only_these_resources": true,
+  "oracle_eligibility_verified_from_combined_evidence": true,
+  "evidence_sha256": "b46c63724a0c6d2c1b1d800542d27453d0819a0ab60b1c93cb18bc7994cf7595",
+  "full_31_day_projection_ocpu_hours": 744,
+  "full_31_day_projection_memory_gib_hours": 4464,
+  "new_cloud_resources_authorized": false,
+  "public_access_authorized": false,
+  "external_backup_activation_authorized": false,
+  "ai_calls_authorized": false
+}

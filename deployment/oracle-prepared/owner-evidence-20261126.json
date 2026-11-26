@@ -56,5 +56,14 @@
     "existing_identity_region_read_succeeded": true,
     "iam_permissions_changed": false,
     "server_modified": false
+  },
+  "owner_inventory_confirmation": {
+    "confirmed_on": "2026-11-26",
+    "only_filip_guard_instance_and_47gb_boot_plus_required_networking": true,
+    "other_instances_created": false,
+    "other_volumes_created": false,
+    "volume_backups_created": false,
+    "other_cloud_services_created": false,
+    "source": "explicit-owner-message"
   }
 }

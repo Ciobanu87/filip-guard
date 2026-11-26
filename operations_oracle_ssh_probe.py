@@ -1,4 +1,4 @@
-"""Read-only SSH preflight for an existing Oracle VM; no provisioning or install.
+"""Pinned SSH transport and read-only preflight for an existing Oracle VM.
 
 The trusted host fingerprint must come from the operator's out-of-band console.
 No credential, IP, host key or raw remote output is printed or archived.
@@ -13,6 +13,12 @@ from pathlib import Path
 import re
 import subprocess
 import tempfile
+
+class HostSetupError(ConnectionError):
+    def __init__(self, phase):
+        self.phase = phase
+        super().__init__('Authorized host setup did not complete')
+
 
 REMOTE_COMMAND = """python3 - <<'PYREMOTE'
 import json,os,platform,subprocess
@@ -49,9 +55,18 @@ def pinned_known_host(host, expected_fingerprint, scan):
     return str(address)+' ssh-ed25519 '+next(iter(keys))+'\n'
 
 
-def run_pinned_command(remote_command,env=None,runner=None):
+def run_pinned_command(remote_command,env=None,runner=None,*,operation="read-only",input_data=None,timeout=40):
     env=os.environ if env is None else env;runner=subprocess.run if runner is None else runner
-    if env.get('FG_OCI_SSH_PROBE_AUTHORIZED')!='1':raise ValueError('Explicit read-only SSH authorization required')
+    if operation == 'read-only':
+        if env.get('FG_OCI_SSH_PROBE_AUTHORIZED') != '1' or input_data is not None or timeout != 40:
+            raise ValueError('Explicit read-only SSH authorization required')
+    elif operation == 'host-setup':
+        if env.get('FG_OCI_HOST_SETUP_AUTHORIZED') != '1' or type(timeout) is not int or not 40 <= timeout <= 900:
+            raise ValueError('Explicit host setup authorization required')
+        if input_data is not None and (type(input_data) is not bytes or len(input_data) > 16 * 1024 * 1024):
+            raise ValueError('Bounded source archive required')
+    else:
+        raise ValueError('Unreviewed SSH operation')
     host=env['FG_OCI_HOST'];expected=env['FG_OCI_HOST_ED25519_SHA256'];private=env['FG_OCI_SSH_PRIVATE_KEY']
     if not ipaddress.ip_address(host).is_global:raise ValueError('Public IP required')
     if not 100<len(private)<=32768 or not private.startswith('-----BEGIN ') or 'PRIVATE KEY-----' not in private[:80]:
@@ -71,10 +86,23 @@ def run_pinned_command(remote_command,env=None,runner=None):
             '-o','PasswordAuthentication=no','-o','KbdInteractiveAuthentication=no',
             '-o','ConnectTimeout=10','-o','ConnectionAttempts=1','-o','LogLevel=ERROR',
             'opc@'+host,remote_command]
-        result=runner(command,capture_output=True,text=True,timeout=40,check=False,env=child_env)
-        if result.returncode!=0:raise ConnectionError('Pinned SSH authentication or read-only check failed')
+        options = dict(capture_output=True, text=input_data is None, timeout=timeout, check=False, env=child_env)
+        if input_data is not None: options['input'] = input_data
+        result=runner(command, **options)
+        if result.returncode != 0:
+            if operation == 'host-setup':
+                phase = 'unknown'
+                try:
+                    data = json.loads(result.stdout)
+                    allowed = {'authorization', 'source-layout', 'official-python-packages', 'isolated-python-environment',
+                               'private-system-user-and-storage', 'inactive-systemd-units', 'nonroot-render-and-loopback-health',
+                               'durable-host-receipt', 'security-configuration', 'reboot-validation'}
+                    if type(data) is dict and data.get('phase') in allowed: phase = data['phase']
+                except Exception: pass
+                raise HostSetupError(phase)
+            raise ConnectionError('Pinned SSH authentication or read-only check failed')
         if len(result.stdout)>4096:raise ValueError('Unexpected remote response')
-        return result.stdout
+        return result.stdout.decode('utf-8') if isinstance(result.stdout, bytes) else result.stdout
 
 
 def run_probe(env=None,runner=None):
