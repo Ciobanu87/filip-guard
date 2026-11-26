@@ -5,7 +5,7 @@ from operations_oracle_ssh_probe import run_pinned_command
 
 
 def validate(data):
-    fields = {'schema', 'status', 'blocked_step', 'scope', 'core_allocation_inventory_verified',
+    fields = {'schema', 'api_http_status', 'status', 'blocked_step', 'scope', 'core_allocation_inventory_verified',
               'compartments_checked', 'a1_instances', 'other_instances', 'a1_ocpus', 'a1_memory_gib',
               'boot_volume_gib', 'block_volume_gib', 'volume_backup_count', 'historical_usage_verified',
               'all_service_costs_verified', 'server_modified', 'iam_permissions_changed', 'groq_calls'}
@@ -21,6 +21,8 @@ def validate(data):
             'sdk-or-identity', 'region-subscriptions', 'compartment-list', 'availability-domain-list',
             'instance-list', 'boot-volume-list', 'block-volume-list', 'volume-backup-list', 'none'):
         raise ValueError('Unexpected status')
+    if type(data['api_http_status']) is not int or not (data['api_http_status'] == 0 or 100 <= data['api_http_status'] <= 599):
+        raise ValueError('Unexpected HTTP status')
     if data['scope'] != 'current-compute-boot-block-and-volume-backups' or data['schema'] != 1 or data['groq_calls'] != 0:
         raise ValueError('Unexpected scope')
     if any(data[k] for k in booleans - {'core_allocation_inventory_verified'}):

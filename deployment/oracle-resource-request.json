@@ -1,1 +1,10 @@
-{"authorized":true,"requested_on":"2026-11-26","scope":"existing-identity-current-core-allocation-read-only","install_or_activate":false,"iam_changes":false,"groq_calls":0}
+{
+  "authorized": true,
+  "requested_on": "2026-11-26",
+  "scope": "existing-identity-current-core-allocation-read-only",
+  "install_or_activate": false,
+  "iam_changes": false,
+  "groq_calls": 0,
+  "diagnostic_revision": 2,
+  "reason": "Distinguish existing instance-list API denial from a client error without printing identifiers or service messages"
+}

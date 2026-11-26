@@ -65,7 +65,6 @@ class ExistingAccountAccessTests(unittest.TestCase):
             with self.assertRaises(ValueError): validate({**result(), **change})
 
 
-if __name__ == '__main__': unittest.main()
 
 
 class CoreAllocationTests(unittest.TestCase):
@@ -150,3 +149,17 @@ class CoreAllocationTests(unittest.TestCase):
                        {'a1_ocpus': float('nan')}, {'account_private_key': 'never-print'},
                        {'scope': 'all-service-account-billing-verified'}):
             with self.assertRaises(ValueError): validate({**blank(), **change})
+
+    def test_api_refusal_status_is_retained_without_sensitive_service_text(self):
+        from deployment.oracle_resource_inspect import collect
+        identity, compute, block = self.clients()
+        failure = RuntimeError('sensitive request-id and service message')
+        failure.status = 404
+        compute.list_instances.side_effect = failure
+        report = collect(identity, compute, block, 'synthetic-tenancy')
+        self.assertEqual(report['api_http_status'], 404)
+        self.assertEqual(report['blocked_step'], 'instance-list')
+        self.assertNotIn('sensitive', json.dumps(report))
+
+
+if __name__ == '__main__': unittest.main()

@@ -11,7 +11,7 @@ import signal
 
 def blank():
     return {'schema': 1, 'status': 'blocked', 'blocked_step': 'sdk-or-identity',
-            'scope': 'current-compute-boot-block-and-volume-backups',
+            'scope': 'current-compute-boot-block-and-volume-backups', 'api_http_status': 0,
             'core_allocation_inventory_verified': False, 'compartments_checked': 0,
             'a1_instances': 0, 'other_instances': 0, 'a1_ocpus': 0.0, 'a1_memory_gib': 0.0,
             'boot_volume_gib': 0, 'block_volume_gib': 0, 'volume_backup_count': 0,
@@ -80,10 +80,12 @@ def collect(identity, compute, block, tenancy):
             report['compartments_checked'] += 1
         report.update(status='current-core-allocations-read', blocked_step='none',
                       core_allocation_inventory_verified=True)
-    except Exception:
+    except Exception as exc:
         # Partial counters are not evidence of a complete total. Drop them.
         blocked = report['blocked_step']
         report = blank(); report['blocked_step'] = blocked
+        status = getattr(exc, 'status', 0)
+        report['api_http_status'] = status if type(status) is int and 100 <= status <= 599 else 0
     return report
 
 
