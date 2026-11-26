@@ -59,6 +59,17 @@ Official references checked for this evidence review:
 - https://docs.oracle.com/en-us/iaas/Content/Billing/Concepts/costusagereportsoverview.htm
 - https://docs.oracle.com/en-us/iaas/tools/python/latest/api/signing.html
 
+Separate live API evidence (Actions run
+https://github.com/Ciobanu87/filip-guard/actions/runs/45829300370) now confirms
+Frankfurt is the home region and the account has exactly one region subscription.
+The SDK is already installed and existing instance-identity region reads work;
+the CLI is absent. No new IAM permission was granted. Do NOT request a duplicate
+home-region screenshot. `operations_oracle_resources.py` subsequently attempts
+only bounded current compute/boot/block/volume-backup reads across compartments.
+It stops on denied/incomplete access and discards partial counters; it does not
+fall back to a root-only view and call it account-wide. Even a complete current
+core allocation is separate from historical usage and unrelated service costs.
+
 ## Prepared file layout
 
 | Path on existing host | Purpose / owner |

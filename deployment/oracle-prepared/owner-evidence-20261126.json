@@ -45,5 +45,16 @@
     "Current-day no-data display is retained as evidence, not converted into verified cumulative zero usage.",
     "Individual Always Free boot volume evidence is accepted and must not be requested again.",
     "No subscription IDs, OCIDs, private keys, credentials or original screenshots are stored in the repository."
-  ]
+  ],
+  "separate_read_only_api_evidence": {
+    "run_url": "https://github.com/Ciobanu87/filip-guard/actions/runs/45829300370",
+    "home_region_frankfurt_verified": true,
+    "region_subscription_count": 1,
+    "region_list_complete": true,
+    "sdk_preinstalled": true,
+    "cli_preinstalled": false,
+    "existing_identity_region_read_succeeded": true,
+    "iam_permissions_changed": false,
+    "server_modified": false
+  }
 }
