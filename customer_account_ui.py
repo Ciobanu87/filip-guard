@@ -27,6 +27,8 @@ def render_customer_account(st_module=None, *, auth=None, allow_registration=Non
                 return None
     if allow_registration is None:
         allow_registration = os.environ.get('FG_CUSTOMER_REGISTRATION') == '1'
+    from customer_recovery_ui import render_account_recovery
+    render_account_recovery(ui,auth,clear_state=lambda:_clear_customer_state(ui))
     with ui.expander('Customer account', expanded=False):
         if auth is None:
             ui.info('Customer sign-in is not enabled for this deployment.')

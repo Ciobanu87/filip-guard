@@ -20,14 +20,31 @@ class DailyBudgetSender:
         self.monitor,self.sender,self.limit,self.clock=monitor,sender,limit,clock
         with monitor.db() as db:
             db.execute('CREATE TABLE IF NOT EXISTS smtp_daily_budget (day TEXT PRIMARY KEY,attempts INTEGER NOT NULL)')
-    def send(self,notification,recipient):
+    def _reserve(self):
         day=datetime.fromtimestamp(self.clock(),timezone.utc).strftime('%Y-%m-%d')
         with self.monitor.db() as db:
             db.execute('BEGIN IMMEDIATE')
             db.execute('INSERT OR IGNORE INTO smtp_daily_budget VALUES (?,0)',(day,))
             changed=db.execute('UPDATE smtp_daily_budget SET attempts=attempts+1 WHERE day=? AND attempts<?',(day,self.limit))
             if changed.rowcount!=1:raise DeliveryNotStarted('Daily deployment email budget exhausted')
+
+    def send(self,notification,recipient):
+        self._reserve()
         return self.sender.send(notification,recipient)
+
+    def send_account_challenge(self,challenge):
+        self._reserve()
+        return self.sender.send_account_challenge(challenge)
+
+
+def configured_smtp_budget(monitor):
+    if os.environ.get('FG_EMAIL_AUTHORIZED')!='1':return None
+    secret_path=os.environ['FG_SMTP_CREDENTIALS_FILE']
+    def credentials():
+        data=json.loads(private_file(secret_path,8192));return data['username'],data['password']
+    credentials()
+    sender=SMTPNotificationSender(SMTPConfig(os.environ.get('FG_SMTP_HOST','smtp-relay.brevo.com'),os.environ['FG_SMTP_SENDER'],587,'starttls'),credentials,authorized=True)
+    return DailyBudgetSender(monitor,sender,limit=int(os.environ.get('FG_SMTP_DAILY_LIMIT','300')))
 
 
 def configured_email_dispatcher(monitor):

@@ -556,6 +556,23 @@ class RealWordPressTests(unittest.TestCase):
                 self.snapshot()
         self.assertEqual(self.fixture.request_count, count)
 
+    def test_real_read_only_compatibility_inventory_is_owner_only_and_not_authority(self):
+        owner=self.fixture.gateway(owner=True)
+        before=owner.read_authorized(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id)
+        with self.assertRaises(PermissionError):
+            self.gateway.assess_compatibility(self.fixture.site_url,'post',self.post_id,self.fixture.editor_id)
+        path=f'/wp-json/filip-guard/v1/resources/post/{self.post_id}/compatibility'
+        _,data=owner._request(path)
+        evidence=data['evidence']
+        self.assertRegex(evidence['theme_sha256'],'^[0-9a-f]{64}$')
+        self.assertIn('fg-fixture-observer.php',evidence['mu_plugins'])
+        result=owner.assess_compatibility(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id,
+            reviewed_theme_sha256=evidence['theme_sha256'])
+        self.assertIn('mu-or-dropin-profile-review',result['blockers'])
+        self.assertFalse(result['production_write_authorized']);self.assertFalse(result['live_compatibility_proven'])
+        self.assertEqual(before,owner.read_authorized(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id))
+        self.assertNotIn('password',json.dumps(evidence).lower())
+
     def test_real_site_ownership_requires_administrative_capability(self):
         with self.assertRaises(PermissionError):
             self.gateway.verify_site_owner()

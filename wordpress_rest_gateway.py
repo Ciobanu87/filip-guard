@@ -164,6 +164,19 @@ class WordPressRESTGateway:
         _, data = self._request(path)
         return self._snapshot(data, kind, resource_id, user_id)
 
+    def assess_compatibility(self, site, kind, resource_id, user_id, *, reviewed_theme_sha256=None, now=None):
+        """Owner-only read of bound inventory; returns diagnostics, never authority."""
+        from wordpress_compatibility import assess_compatibility
+        path=self._target(site,kind,resource_id,user_id)
+        self._identity(user_id)
+        _,data=self._request(path+'/compatibility')
+        if data.get('protocol')!='filip-guard-compatibility-v1' or type(data.get('snapshot')) is not dict or type(data.get('evidence')) is not dict:
+            raise WordPressRESTError('Invalid WordPress compatibility evidence')
+        snapshot=self._snapshot(data['snapshot'],kind,resource_id,user_id)
+        # Origin comes from this authenticated pinned transport, never a remote site_url field.
+        evidence={**data['evidence'],'site_url':self.site_url}
+        return assess_compatibility(snapshot,evidence,reviewed_theme_sha256=reviewed_theme_sha256,now=now)
+
     def compare_and_swap(self, expected, content, user_id, *, operation_id):
         if type(expected) is not ResourceSnapshot:
             raise ValueError('Verified resource snapshot required')
@@ -174,6 +187,8 @@ class WordPressRESTGateway:
                 or type(operation_id) is not str or not re.fullmatch('[A-Za-z0-9:_-]{1,96}', operation_id)
                 or not re.fullmatch('[0-9a-f]{64}', expected.revision)):
             raise ValueError('Invalid conditional WordPress content update')
+        from wordpress_compatibility import require_content_profile
+        require_content_profile(expected.content);require_content_profile(content)
         self._identity(user_id)
         _, data = self._request(path, method='POST', data={
             'expected_version': expected.revision, 'proposed_content': content,

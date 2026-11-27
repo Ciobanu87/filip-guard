@@ -12,8 +12,8 @@ The companion, repair origin restrictions and production guards remain intact.
 | API & App Guard | Public GET/status/JSON contracts, no secrets/raw responses retained; tenant-owned resources | Real authorized endpoint contracts; authenticated APIs/browser journeys are outside current implemented scope |
 | Infrastructure Guard | Public DNS, verified TLS expiration, optional authoritative RDAP with unknowns preserved | Real authorized DNS/TLS/registrar coverage; no DNS/certificate/domain mutations |
 | AI Advisor | Provider interface, Groq adapter, evidence guard, scoped cache, global retained budget, per-provider backoff; historical nine live cases accepted | New complex semantic holdouts are simulated so far; prepared live runner defaults to approval-required; model quality/general safety are not established by contract tests |
-| Customer identity/isolation | Local accounts, salted password hashing, private durable sessions/site ownership and domain-control proofs | Real deployment/TLS, signup/recipient policies, account recovery/email verification and deletion/privacy workflow require closure before commercial access; they are not claimed complete |
-| WordPress AutoFix | Exact broken-anchor replacement in post/page content: explicit session-bound approval, verified encrypted backup, conditional apply/verify/rollback and separate reviewed restore | Companion is nonproduction/test-only. Production compatibility profile, supported editor/plugin hooks and live permission/rollback validation remain unresolved. General metadata/plugin/builder repair and full-site restore are not implemented |
+| Customer identity/isolation | Local accounts, salted password hashing, private durable sessions/site ownership and domain-control proofs | Opt-in verified-contact/password recovery implemented offline: expiring single-use codes, encrypted delivery queue, shared SMTP attempt cap and session revocation. Real TLS/mail delivery, signup/recipient policies and deletion/privacy workflow remain unvalidated/incomplete; no customer address was verified by this batch |
+| WordPress AutoFix | Exact broken-anchor replacement in post/page content: explicit session-bound approval, verified encrypted backup, conditional apply/verify/rollback and separate reviewed restore | Companion is nonproduction/test-only. Conservative classic-HTML profile now enforced before proposal and conditional writes; owner-only read-only environment inventory and evidence criteria are implemented. Live theme/plugin compatibility, permission/rollback validation and a reviewed production activation path remain unresolved. General metadata/plugin/builder repair and full-site restore are not implemented |
 | Monitoring | Four-module scheduling, durable reservations/leases, verified resolution scopes, failure isolation, history/inbox and email outbox; no automatic model/repair execution | Oracle worker activation and sustained real operation require approval; live email delivery remains unvalidated |
 | External recovery | B2 mounted; owner-confirmed zero-dollar caps; notification API reported not enabled; owner independently recovered master fixture; real Oracle AI-ledger encrypted backup/fresh restore verified | This was one SQLite database, not full future customer state or WordPress/VM recovery. Keep private manifest/key custody, review current headroom before future writes, then validate newly provisioned full state |
 | Oracle runtime | Existing Always Free host installed/hardened/reboot-tested previously; private storage and inactive units | Installed application snapshot predates recent development. Current source install, explicit fresh account/site/monitor bootstrap, current root activation approval and controlled startup remain unperformed |
@@ -40,6 +40,22 @@ the existing configured advisor/ledger only after explicit opt-in. Private durab
 attempt/result receipts prevent blind repeat of a lost result. Contract/relevance,
 coverage or safety failure stops the run. Completed original fixtures are not in
 this suite. Human semantic validation stays false even when observable gates pass.
+
+## Account recovery and WordPress profile development
+
+`ACCOUNT_RECOVERY.md` describes optional account verification/recovery, disabled
+by default, with the retained master only. Recovery does not create a session,
+change the customer ID, grant repairs, recover an unverified mailbox, replace a
+verified address or reset any budget. Tests exercise simultaneous consumption,
+uncertain delivery, tampered encrypted payloads, UI confirmation and a reset
+invalidating the previous repair session. Account and monitoring mail share the
+same durable SMTP cap; a failed account dispatcher does not skip monitoring mail.
+
+`WORDPRESS_COMPATIBILITY_PROFILE.md` defines the conservative classic content
+profile and bound, short-lived environment evidence. The Python engine/gateway
+and PHP companion reject unsupported editors/builders before mutation. This is
+a restriction, not a plugin-compatibility guarantee. The readiness report now
+explicitly requires compatibility evidence and still cannot authorize writes.
 
 ## Readiness conclusion
 

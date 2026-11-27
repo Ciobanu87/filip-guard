@@ -56,7 +56,7 @@ function update_option($name, $value, $autoload) {
 function add_action($hook, $callback, $priority = 10, $count = 1) { $GLOBALS['actions'][$hook] = $callback; }
 function register_rest_route($namespace, $route, $endpoints) {
     check($namespace === 'filip-guard/v1', 'namespace');
-    if ($route === '/ownership') { check(isset($endpoints['permission_callback']), 'ownership permissions'); return; }
+    if ($route === '/ownership' || str_ends_with($route, '/compatibility')) { check(isset($endpoints['permission_callback']), 'ownership permissions'); return; }
     check(count($endpoints) === 2, 'GET and POST registered');
     foreach ($endpoints as $endpoint) { check(isset($endpoint['permission_callback']), 'permission callback'); }
 }
@@ -165,7 +165,12 @@ check($read instanceof WP_REST_Response && $read->status === 200, 'authorized re
 check($read->headers['Cache-Control'] === 'no-store, private', 'private uncached content');
 $data = array('expected_version' => $read->data['version'], 'operation_id' => 'test-operation',
     'proposed_content' => '<p>Updated</p>', 'user_id' => 7);
-if ($scenario === 'invalid_payload') {
+if ($scenario === 'unsupported_profile') {
+    foreach (array('<!-- wp:paragraph --><p>Block</p><!-- /wp:paragraph -->', '[gallery ids="1"]', '<div data-elementor-id="1">Builder</div>') as $unsupported) {
+        code(Filip_Guard_Companion::update(new Request(array_merge($data, array('proposed_content' => $unsupported)))), 'fg_compatibility');
+    }
+    check($wpdb->queries === 0, 'unsupported profiles cannot write');
+} elseif ($scenario === 'invalid_payload') {
     foreach (array(array('user_id' => 8), array('user_id' => true),
         array('expected_version' => 'forged'), array('operation_id' => "bad\r\n"),
         array('proposed_content' => '<script>bad</script>'), array('extra' => 'field')) as $change) {

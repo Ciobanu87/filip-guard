@@ -70,6 +70,26 @@ class SMTPNotificationSender:
             elif 'message' in event:lines.append(str(event['message'])[:300])
         lines+=['','Sign in to FILIP GUARD to review the details. No repairs were authorized by this notification.']
         message.set_content('\n'.join(lines)[:20000])
+        return self._deliver(message,destination)
+
+    def send_account_challenge(self,challenge):
+        # Only the trusted encrypted account queue calls this; never expose as a raw client endpoint.
+        if not self.authorized:raise EmailNotConfigured('Account email delivery has not been authorized')
+        if type(challenge) is not dict or set(challenge)!={'challenge_id','customer_id','purpose','address','token'}:
+            raise DeliveryNotStarted('Invalid account email request')
+        if (challenge['purpose'] not in ('verify','recover') or not re.fullmatch('[0-9a-f]{32}',challenge['customer_id'])
+            or not re.fullmatch('[0-9a-f]{32}',challenge['challenge_id']) or not re.fullmatch('[A-Za-z0-9_-]{43}',challenge['token'])):
+            raise DeliveryNotStarted('Invalid account email request')
+        destination=_address(challenge['address']);message=EmailMessage()
+        purpose='Email verification' if challenge['purpose']=='verify' else 'Password recovery'
+        message['Subject']='FILIP GUARD — '+purpose
+        message['From']=self.config.sender;message['To']=destination
+        message['Message-ID']='<'+challenge['challenge_id']+'@'+self.config.sender.split('@')[1]+'>'
+        message.set_content(purpose+' code (expires in 15 minutes):\n\n'+challenge['token']+
+            '\n\nEnter this code only in your FILIP GUARD account form. No password, login session or repair is granted by this email. If you did not request it, ignore it.')
+        return self._deliver(message,destination)
+
+    def _deliver(self,message,destination):
         connection=None;started=False
         try:
             credentials=self.credentials()

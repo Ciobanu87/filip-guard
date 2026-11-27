@@ -59,8 +59,11 @@ reconciled AI ledger byte-for-byte; never create a replacement AI budget.
 
 Run the existing read-only state/schema/AI-history checks and verify permissions,
 restore-review markers and distinct DB paths. Prepare account policy/registration
-and owner test identity explicitly; do not invent email verification/recovery or
-claim customer onboarding complete. After real state changes, obtain a bounded
+and owner test identity explicitly. Optional verification/recovery is implemented
+but remains off (`FG_ACCOUNT_RECOVERY_AUTHORIZED=0`); do not claim that offline
+tests verified a real mailbox or completed customer onboarding. Follow
+`../ACCOUNT_RECOVERY.md`; its additive tables belong to the existing auth DB and
+must be included in a later full-state recovery proof. After real state changes, obtain a bounded
 fresh encrypted recovery proof using current saved zero caps/headroom and retained
 master custody. The earlier one-DB drill is not proof for databases created later.
 
@@ -106,12 +109,16 @@ Do not enable the companion for production or expand `.test` mutation scope.
 Actual hosting/plugin compatibility is not established by the prior CI fixture.
 The current mutation UI accepts only `.test` origins and has no approved general
 external-staging activation path. Resolve/review that functional boundary and the
-compatibility profile before proposing a real external staging trial; an approval
+compatibility profile in `../WORDPRESS_COMPATIBILITY_PROFILE.md` before proposing a real external staging trial; an approval
 alone must not be treated as code support for an otherwise rejected origin.
 
 Email: owner-confirmed free SMTP account, authenticated sender and consenting owner
 recipient; approve one bounded real delivery using existing TLS transport and
-retained outbox reservation. No customer mailing, subscription upgrade or secret
+retained outbox reservation. Account verification/recovery must separately opt in
+with the existing retained master, private account state and shared SMTP cap.
+Verify the mailbox, expiry/single use, password reset and revoked sessions using
+an owner-controlled test account; do not use a real customer or bypass mailbox
+loss. No customer mailing, subscription upgrade or secret
 in chat/repository/logs. Check real delivery, error reporting and no blind retry.
 
 ## 6. Final explicit approval: controlled service activation

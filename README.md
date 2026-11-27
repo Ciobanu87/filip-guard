@@ -134,6 +134,11 @@ maintenance or enabled for customers without resolving and validating the requir
 compatibility behavior. Existing content that fails the HTML filter cannot be
 restored through this endpoint; the engine reports restoration failure explicitly.
 Saved content backups are not full-site backups.
+The conservative `classic-html-link-v1` content restriction is enforced in the
+engine, gateway and companion. Blocks, shortcodes and known builder markup are
+rejected. [WORDPRESS_COMPATIBILITY_PROFILE.md](WORDPRESS_COMPATIBILITY_PROFILE.md)
+defines the isolated environment evidence/review requirements; passing a
+diagnostic profile never authorizes production writes.
 
 Tests cover actual Python HTTP serialization/parsing with synthetic sockets and
 execute the PHP endpoint against controlled WordPress/wpdb API stubs. A second
@@ -182,7 +187,10 @@ The account UI is configured only when the operator supplies `FG_CUSTOMER_AUTH_D
 development deployment. No such deployment or personal account was configured in
 this work. Login credentials are not placed in URLs, browser local storage, logs
 or the repair journal. Logout clears customer UI state. Real deployment still
-needs TLS/session operational review, recovery and signup-abuse controls.
+needs TLS/session operational review, authorized live delivery and signup-abuse controls.
+Optional verification/recovery is implemented behind explicit disabled flags; see
+[ACCOUNT_RECOVERY.md](ACCOUNT_RECOVERY.md). This does not gate legacy usernames
+on email or claim that any deployed customer address has been verified.
 
 `CustomerSites` is the trusted service boundary. It resolves the customer from
 the session for every operation; callers never choose a customer ID. A site can

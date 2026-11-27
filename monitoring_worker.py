@@ -11,7 +11,7 @@ from monitoring_configuration import configured_monitoring
 from monitoring_email_configuration import configured_email_dispatcher
 
 
-def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
+def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None,account_dispatcher=None):
     parser=argparse.ArgumentParser(description='FILIP GUARD authorized read-only monitoring worker')
     parser.add_argument('--once',action='store_true')
     parser.add_argument('--poll-seconds',type=int,default=30)
@@ -28,6 +28,10 @@ def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
     try:email_dispatcher=email_dispatcher if email_dispatcher is not None else configured_email_dispatcher(service)
     except Exception:
         email_dispatcher=None;email_config_failed=True
+    try:
+        from customer_recovery_configuration import configured_account_dispatcher
+        account_dispatcher=account_dispatcher if account_dispatcher is not None else configured_account_dispatcher(service)
+    except Exception:account_dispatcher=None
     stop=stop_event if stop_event is not None else threading.Event()
     previous={}
     if threading.current_thread() is threading.main_thread():
@@ -43,6 +47,9 @@ def main(argv=None,*,service=None,stop_event=None,email_dispatcher=None):
                     if status=='idle':break
                     summary['processed']+=1
                     if status in ('complete','partial','error'):summary[status]+=1
+                if account_dispatcher is not None:
+                    try:summary['account_email']=account_dispatcher.dispatch_once()
+                    except Exception:summary['account_email']={'status':'unavailable'}
                 summary['email']=email_dispatcher.dispatch_once() if email_dispatcher is not None else {'status':'configuration_unavailable' if email_config_failed else 'disabled','sent':0}
             except Exception:
                 summary['error']+=1

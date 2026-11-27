@@ -16,6 +16,7 @@ class RemoteReadinessEvidence:
     server_side_conditional_write_supported: bool = False
     post_write_verification_supported: bool = False
     rollback_tested: bool = False
+    wordpress_compatibility_verified: bool = False
 
 
 _CHECKS = (
@@ -27,6 +28,7 @@ _CHECKS = (
     'server_side_conditional_write_supported',
     'post_write_verification_supported',
     'rollback_tested',
+    'wordpress_compatibility_verified',
 )
 
 

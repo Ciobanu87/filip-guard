@@ -104,6 +104,8 @@ class AutoFixEngine:
         verify_unchanged(original, original)
         if (original.site_url, original.resource_type, original.resource_id) != (site_url, resource_type, resource_id):
             raise PermissionError('Gateway returned the wrong resource')
+        from wordpress_compatibility import require_content_profile
+        require_content_profile(original.content);require_content_profile(proposed_content)
         if proposed_content == original.content:
             raise ValueError('No content change')
         plan_id = uuid.uuid4().hex

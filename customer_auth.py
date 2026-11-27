@@ -1,7 +1,8 @@
 """Local customer identity and opaque server sessions; no WordPress credentials.
 
 Passwords use salted scrypt; only session-token digests are stored. Production
-TLS, signup policy, email verification/reset and deployment remain separate.
+TLS, signup policy and deployment remain separate. Optional verified-contact
+recovery is implemented in customer_recovery and disabled by default.
 """
 from contextlib import contextmanager
 from dataclasses import dataclass

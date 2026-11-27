@@ -129,6 +129,84 @@ final class Filip_Guard_Companion {
         return is_wp_error($row) ? $row : self::response(self::snapshot($row));
     }
 
+    private static function theme_fingerprint() {
+        // Hash actual reviewed theme files, not merely a version label. Bound work.
+        $theme = wp_get_theme();
+        $roots = array('template' => $theme->get_template_directory(),
+            'stylesheet' => $theme->get_stylesheet_directory());
+        $manifest = array(); $bytes = 0; $files = 0; $seen = array();
+        $started = microtime(true);
+        foreach ($roots as $label => $root) {
+            if (!is_string($root) || is_link($root) || !is_dir($root)) { return null; }
+            $root = realpath($root);
+            if (isset($seen[$root])) { continue; }
+            $seen[$root] = true;
+            $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root,
+                FilesystemIterator::SKIP_DOTS));
+            foreach ($iterator as $file) {
+                $files++;
+                if ($files > 1000 || microtime(true) - $started > 2) { return null; }
+                if ($file->isLink()) { return null; }
+                if (!$file->isFile()) { continue; }
+                $bytes += $file->getSize();
+                if ($files > 1000 || $bytes > 10000000) { return null; }
+                $digest = hash_file('sha256', $file->getPathname());
+                if ($digest === false) { return null; }
+                $relative = substr($file->getPathname(), strlen($root) + 1);
+                $manifest[$label . '/' . str_replace(DIRECTORY_SEPARATOR, '/', $relative)] = $digest;
+            }
+        }
+        if (!$manifest) { return null; }
+        ksort($manifest);
+        return hash('sha256', wp_json_encode($manifest));
+    }
+
+    public static function compatibility_permission($request) {
+        $owner = self::ownership_permission($request);
+        return $owner === true ? self::permission($request) : $owner;
+    }
+
+    public static function compatibility($request) {
+        // Authenticated, owner-only, read-only inventory. Never a write admission.
+        $permission = self::compatibility_permission($request);
+        if ($permission !== true) { return $permission; }
+        list($kind, $id) = self::target($request);
+        $row = self::row($kind, $id);
+        if (is_wp_error($row)) { return $row; }
+        try {
+            if (!function_exists('get_mu_plugins') || !function_exists('get_dropins')) {
+                require_once ABSPATH . 'wp-admin/includes/plugin.php';
+            }
+            $metadata = get_post_custom_keys($id);
+            if ($metadata === null) { $metadata = array(); }
+            $plugins = get_option('active_plugins', array());
+            $mu = array_keys(get_mu_plugins()); $dropins = array_keys(get_dropins());
+            foreach (array($plugins, $mu, $dropins, $metadata) as $items) {
+                if (!is_array($items) || count($items) > 200) { return self::error('fg_inventory', 409); }
+                foreach ($items as $item) {
+                    if (!is_string($item) || strlen($item) > 256) { return self::error('fg_inventory', 409); }
+                }
+            }
+            $snapshot = self::snapshot($row);
+            if (is_wp_error($snapshot)) { return $snapshot; }
+            $evidence = array('resource_type' => $kind, 'resource_id' => $id,
+                'revision' => $snapshot['version'], 'content_sha256' => hash('sha256', $row['post_content']),
+                'observed_at' => time(), 'environment' => wp_get_environment_type(),
+                'wp_version' => get_bloginfo('version'), 'multisite' => is_multisite(),
+                'active_plugins' => array_values($plugins), 'mu_plugins' => $mu, 'dropins' => $dropins,
+                'metadata_keys' => array_values($metadata), 'theme_sha256' => self::theme_fingerprint());
+            return self::response(array('protocol' => 'filip-guard-compatibility-v1',
+                'snapshot' => $snapshot, 'evidence' => $evidence));
+        } catch (Throwable $error) {
+            return self::error('fg_inventory', 409);
+        }
+    }
+
+    private static function compatible_content($content) {
+        // Classic HTML only. This is a restriction, never production authorization.
+        return is_string($content) && !preg_match('~<!--\s*wp:|\[/?[A-Za-z][A-Za-z0-9_-]*(?:\s[^\]]*)?/?\]|data-(?:elementor|vc|fl)-|et_pb_|fl-builder~i', $content);
+    }
+
     public static function update($request) {
         global $wpdb;
         $permission = self::permission($request);
@@ -153,6 +231,9 @@ final class Filip_Guard_Companion {
         $row = self::row($kind, $id);
         if (is_wp_error($row)) {
             return $row;
+        }
+        if (!self::compatible_content($row['post_content']) || !self::compatible_content($data['proposed_content'])) {
+            return self::error('fg_compatibility', 409);
         }
         // Unique option reservation is durable and survives lost replies/process restarts.
         // Pending reservations are never retried automatically after an uncertain outcome.
@@ -248,6 +329,10 @@ final class Filip_Guard_Companion {
         register_rest_route('filip-guard/v1', '/ownership', array(
             'methods' => 'GET', 'callback' => array(__CLASS__, 'ownership'),
             'permission_callback' => array(__CLASS__, 'ownership_permission'),
+        ));
+        register_rest_route('filip-guard/v1', '/resources/(?P<kind>post|page)/(?P<id>[1-9][0-9]{0,9})/compatibility', array(
+            'methods' => 'GET', 'callback' => array(__CLASS__, 'compatibility'),
+            'permission_callback' => array(__CLASS__, 'compatibility_permission'),
         ));
         register_rest_route('filip-guard/v1', '/resources/(?P<kind>post|page)/(?P<id>[1-9][0-9]{0,9})', array(
             array('methods' => 'GET', 'callback' => array(__CLASS__, 'read'),

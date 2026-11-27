@@ -74,3 +74,32 @@ class EmailOperationsTests(unittest.TestCase):
         result=json.loads(output.getvalue())
         self.assertEqual(result['email']['status'],'configuration_unavailable')
         self.assertNotIn('synthetic-secret',output.getvalue())
+
+    def test_account_and_monitor_messages_share_one_durable_smtp_budget(self):
+        sender=Mock();first=DailyBudgetSender(self.f.monitor,sender,limit=2,clock=lambda:100)
+        second=DailyBudgetSender(self.f.monitor,sender,limit=2,clock=lambda:101)
+        first.send({},None);second.send_account_challenge({})
+        with self.assertRaises(DeliveryNotStarted):first.send_account_challenge({})
+        with self.assertRaises(DeliveryNotStarted):second.send({},None)
+        sender.send.assert_called_once();sender.send_account_challenge.assert_called_once()
+
+    def test_account_email_uses_verified_tls_and_fixed_message_without_real_send(self):
+        from monitoring_email import SMTPConfig,SMTPNotificationSender
+        connection=Mock();connection.send_message.return_value={}
+        sender=SMTPNotificationSender(SMTPConfig('smtp.example.test','sender@example.test',587,'starttls'),lambda:('fixture','fixture'),authorized=True)
+        challenge={'challenge_id':'a'*32,'customer_id':'b'*32,'purpose':'recover','address':'owner@example.test','token':'c'*43}
+        with patch('smtplib.SMTP',return_value=connection):sender.send_account_challenge(challenge)
+        self.assertTrue(connection.starttls.call_args.kwargs['context'].check_hostname)
+        message=connection.send_message.call_args.args[0]
+        self.assertIn(challenge['token'],message.get_content())
+        self.assertEqual(connection.send_message.call_args.kwargs['to_addrs'],['owner@example.test'])
+        self.assertNotIn('http',message.get_content())
+
+    def test_account_dispatch_failure_does_not_skip_monitor_notification(self):
+        account=Mock();account.dispatch_once.side_effect=RuntimeError('synthetic-secret')
+        notifications=Mock();notifications.dispatch_once.return_value={'status':'idle'}
+        output=StringIO()
+        with redirect_stdout(output):self.assertEqual(main(['--once'],service=self.f.monitor,email_dispatcher=notifications,account_dispatcher=account),0)
+        notifications.dispatch_once.assert_called_once()
+        self.assertEqual(json.loads(output.getvalue())['account_email'],{'status':'unavailable'})
+        self.assertNotIn('synthetic-secret',output.getvalue())
