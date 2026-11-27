@@ -26,12 +26,14 @@ def require_existing_database(path, tables):
         if any((parent / 'FG-RESTORE-REVIEW-REQUIRED').exists() for parent in path.absolute().parents):
             raise ValueError('Recovered state requires operator reconciliation')
         # mode=ro is essential: SQLite's default mode can create a missing DB.
-        with sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=5) as db:
+        db=sqlite3.connect(path.resolve().as_uri() + '?mode=ro', uri=True, timeout=5)
+        try:
             present = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if not set(tables).issubset(present):
                 raise ValueError('Existing application state is incomplete')
             if db.execute('PRAGMA quick_check(1)').fetchone() != ('ok',):
                 raise ValueError('Existing application state is corrupt')
+        finally:db.close()
     except (OSError, sqlite3.Error):
         raise ValueError('Existing private application state unavailable; restore before startup') from None
     return str(path)

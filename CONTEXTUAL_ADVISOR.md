@@ -196,3 +196,8 @@ construction skips development schema bootstrap entirely. A ledger disappearing
 or being placed under a recovery hold after startup therefore cannot create an
 empty replacement or issue a new request. The transactional history check remains
 necessary after the file preflight so admission validates the locked snapshot.
+
+Both persistent-state and AI-budget preflight validators explicitly close their
+read-only SQLite connections on success and failure. Regression checks retain the
+connection objects and verify they are closed, rather than relying on garbage
+collection during repeated interface reloads.

@@ -2,6 +2,7 @@ from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from advisor_ledger import require_existing_advisor_ledger,validate_budget_history
 
 
@@ -51,6 +52,24 @@ class ExistingAdvisorLedgerTests(unittest.TestCase):
     def test_transaction_validation_detects_counter_loss_after_startup(self):
         require_existing_advisor_ledger(self.path);self.change('DELETE FROM advisor_budget')
         with sqlite3.connect(self.path) as db,self.assertRaises(ValueError):validate_budget_history(db)
+
+    def check_connections_closed(self,should_fail):
+        real_connect=sqlite3.connect;connections=[]
+        def track(*args,**kwargs):
+            connection=real_connect(*args,**kwargs);connections.append(connection);return connection
+        with patch('sqlite3.connect',side_effect=track):
+            if should_fail:
+                with self.assertRaises(ValueError):require_existing_advisor_ledger(self.path)
+            else:require_existing_advisor_ledger(self.path)
+        self.assertTrue(connections)
+        for connection in connections:
+            with self.assertRaises(sqlite3.ProgrammingError):connection.execute('SELECT 1')
+
+    def test_readonly_connections_close_after_success(self):
+        self.check_connections_closed(False)
+
+    def test_readonly_connections_close_when_ledger_is_partial(self):
+        self.change('DROP TABLE advisor_budget');self.check_connections_closed(True)
 
 
 if __name__=='__main__':unittest.main()

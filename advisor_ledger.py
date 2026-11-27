@@ -34,8 +34,9 @@ def validate_budget_history(db):
 def require_existing_advisor_ledger(path):
     try:
         require_existing_database(path,TABLES)
-        with sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro',uri=True,timeout=5) as db:
-            validate_budget_history(db)
+        db=sqlite3.connect(Path(path).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
+        try:validate_budget_history(db)
+        finally:db.close()
     except (sqlite3.Error,ValueError,OSError):
         raise AdvisorLedgerError('AI usage ledger unavailable; restore before inference') from None
     return str(path)
