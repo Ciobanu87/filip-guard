@@ -8,9 +8,10 @@ CALLS=0
 HTTP_STATUS=None
 ERROR_CODE=None
 ERROR_HINT=None
+ERROR_WORDS=[]
 
 def main():
-    global PHASE,CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT
+    global PHASE,CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT,ERROR_WORDS
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     PHASE='custody-and-service-hold'
     helper=runpy.run_path('/usr/local/sbin/filip-guard-master-custody')
@@ -28,7 +29,7 @@ def main():
     session=requests.Session();session.trust_env=False
     def get(url,authorization,params=None):
         nonlocal calls
-        global CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT
+        global CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT,ERROR_WORDS
         calls+=1;CALLS=calls
         if calls>2:raise ValueError('Bounded read-only request count exceeded')
         with session.get(url,headers={'Authorization':authorization},params=params,timeout=(5,10),allow_redirects=False,stream=True) as response:
@@ -41,6 +42,9 @@ def main():
                 ERROR_CODE=code if re.fullmatch('[a-z_]{1,64}',code) else 'unclassified'
                 message=data.get('message','') if isinstance(data,dict) else ''
                 ERROR_HINT=('bucket-parameter-missing' if 'bucketId' in message and any(x in message.lower() for x in ('missing','required')) else 'api-request-rejected')
+                vocabulary={'api','version','unsupported','support','supported','v3','v4','get','post','method','must','body','request','json','parse','parameter','query','unexpected','missing','bucketid','account','enabled','allowed','notifications','not','cannot','found','invalid','content','type','token','authorization','forbidden','requires','required','disabled','operation','endpoint','notification','empty','path','url','protocol','authentication','insufficient','malformed','argument','capability','bucket','prefix','restriction','restricted','file','key','application','permissions','read','write','list','with','without','call','id'}
+                ERROR_WORDS=sorted(set(re.findall('[a-z0-9]+',message.lower())) & vocabulary)
+                if 'prefix' in ERROR_WORDS and 'key' in ERROR_WORDS:ERROR_HINT='existing-key-prefix-restriction'
                 raise ValueError('Read-only request held')
             return data
     try:
@@ -79,4 +83,4 @@ def main():
 if __name__=='__main__':
     try:print(json.dumps(main(),sort_keys=True))
     except Exception:
-        print(json.dumps({'status':'b2-read-only-inspection-held','phase':PHASE,'b2_api_calls':CALLS,'last_http_status':HTTP_STATUS,'error_code':ERROR_CODE,'error_hint':ERROR_HINT,'services_started':False,'secret_values_printed':False,'automatic_retries':0},sort_keys=True))
+        print(json.dumps({'status':'b2-read-only-inspection-held','phase':PHASE,'b2_api_calls':CALLS,'last_http_status':HTTP_STATUS,'error_code':ERROR_CODE,'error_hint':ERROR_HINT,'error_vocabulary':ERROR_WORDS,'services_started':False,'secret_values_printed':False,'automatic_retries':0},sort_keys=True))

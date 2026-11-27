@@ -13,7 +13,7 @@ def main():
     compile(source,'b2-readonly-inspection','exec')
     result=json.loads(run_pinned_command('sudo -n -- /opt/filip-guard/.venv/bin/python -c '+shlex.quote(source),operation='host-setup',timeout=90))
     if result.get('status') not in ('b2-read-only-metadata-inspected','b2-read-only-inspection-held'):raise ValueError('Read-only metadata unavailable')
-    allowed={'status','b2_api_calls','groq_api_calls','services_started','objects_uploaded','objects_downloaded','notification_writes','automatic_retries','bucket_scoped_key','can_read_notifications','can_write_notifications','notifications_verified_disabled','account_wide_other_activity_verified','remaining_evidence','notification_rule_count','phase','last_http_status','secret_values_printed','error_code','error_hint'}
+    allowed={'status','b2_api_calls','groq_api_calls','services_started','objects_uploaded','objects_downloaded','notification_writes','automatic_retries','bucket_scoped_key','can_read_notifications','can_write_notifications','notifications_verified_disabled','account_wide_other_activity_verified','remaining_evidence','notification_rule_count','phase','last_http_status','secret_values_printed','error_code','error_hint','error_vocabulary'}
     if set(result)-allowed:raise ValueError('Unreviewed metadata is never published')
     print(json.dumps(result,sort_keys=True))
 
