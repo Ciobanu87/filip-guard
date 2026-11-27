@@ -33,61 +33,7 @@ if render_guard_application():
 render_customer_account()
 
 
-def wordpress_public_items(site_host):
-    """Read a small, bounded sample of public WP REST API content; never edit."""
-    items = []
-    for kind in ('pages', 'posts'):
-        endpoint = f'https://{site_host}/wp-json/wp/v2/{kind}?per_page=30&_fields=link,slug,title,status'
-        try:
-            validate_url(endpoint, site_host)
-            response = requests.get(endpoint, headers=HEADERS, timeout=(4, 8),
-                                    allow_redirects=False, stream=True)
-            try:
-                if response.status_code != 200 or 'json' not in response.headers.get('Content-Type', '').lower():
-                    continue
-                chunks = bytearray()
-                for chunk in response.iter_content(chunk_size=16384):
-                    chunks.extend(chunk)
-                    if len(chunks) > MAX_BYTES:
-                        raise ValueError('WordPress API response too large')
-                import json
-                data = json.loads(chunks)
-                if isinstance(data, list):
-                    items.extend(item for item in data if isinstance(item, dict))
-            finally:
-                response.close()
-        except (requests.RequestException, ValueError, UnicodeError):
-            continue
-    return items
-
-
-def verified_wordpress_suggestions(broken):
-    """Read-only suggestions; verify URLs and require human review."""
-    if not broken:
-        return []
-    host = urlparse(broken[0]['link']).hostname
-    if not host:
-        return []
-    items = wordpress_public_items(host)
-    if not items:
-        return []
-    suggestions = []
-    for issue in broken[:5]:
-        broken_url = issue['link']
-        if urlparse(broken_url).hostname != host:
-            continue
-        for match in suggest_replacements(broken_url, items, limit=3):
-            candidate = match['candidate_url']
-            try:
-                status, _, _ = fetch(candidate, host, 'HEAD')
-                if status in (403, 405, 501):
-                    status, _, _ = fetch(candidate, host, 'GET')
-                if 200 <= status < 400:
-                    match['verified'] = True
-                    suggestions.append(match)
-            except (requests.RequestException, ValueError):
-                continue
-    return suggestions
+from public_scan_workflow import run_public_scan, public_wordpress_items as wordpress_public_items, verified_wordpress_suggestions
 
 
 def to_csv(rows):
@@ -111,15 +57,11 @@ if submitted:
     else:
         try:
             with st.spinner('Scanning public pages. This may take a little while…'):
-                contexts={}
-                rows, broken, checked, discovered = scan(url.strip(), pages,context_observer=lambda page,text:contexts.update({page:text}))
-            candidates = verified_wordpress_suggestions(broken) if broken else []
-            st.session_state['fg_scan_result'] = {
-                'start_url': url.strip(), 'rows': rows, 'broken': broken,
-                'checked': checked, 'discovered': discovered, 'candidates': candidates,'contexts':contexts,
-            }
-        except (ValueError, requests.RequestException) as exc:
-            st.error(f'Could not scan: {exc}')
+                result=run_public_scan(url.strip(),pages)
+            result['candidates']=verified_wordpress_suggestions(result['broken']) if result['broken'] else []
+            st.session_state['fg_scan_result']=result
+        except (ValueError, requests.RequestException):
+            st.error('The HTTPS scan could not be completed. Check the public URL and try again after reviewing the failure.')
 
 result = st.session_state.get('fg_scan_result')
 if result is not None:
@@ -128,6 +70,8 @@ if result is not None:
     checked = result['checked']
     discovered = result['discovered']
     st.success(f'Scanned {len(rows)} pages')
+    if result.get('complete') is False:
+        st.warning('This scan is incomplete. Request/time limits or blocked responses may leave issues unverified.')
     a, b, c = st.columns(3)
     a.metric('Pages', len(rows))
     b.metric('Links checked', checked)

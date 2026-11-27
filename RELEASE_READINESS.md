@@ -1,0 +1,51 @@
+# FILIP GUARD development and release readiness — 2026-11-27
+
+This is an evidence/scope matrix, not a declaration that the product is finished.
+Development is confined to `filip-guard-development`; `main` is unchanged. No new
+host/provider call, service activation or paid resource is authorized by this file.
+The companion, repair origin restrictions and production guards remain intact.
+
+| Component | Implemented and exercised offline/isolated | Mandatory remaining boundary |
+| --- | --- | --- |
+| Website Guard / public Scanner | Bounded verified HTTPS, SEO/link observations, sanitized evidence, public read-only WordPress suggestions; incomplete results visible | Authorized real-site validation of current source; HTTP without TLS is intentionally unsupported |
+| Commerce Guard | Public catalog/Product/Offer checks; shared budgets, scopes/history and alerts | Real authorized shop/schema coverage; no checkout/order/payment tests or automated commerce repairs |
+| API & App Guard | Public GET/status/JSON contracts, no secrets/raw responses retained; tenant-owned resources | Real authorized endpoint contracts; authenticated APIs/browser journeys are outside current implemented scope |
+| Infrastructure Guard | Public DNS, verified TLS expiration, optional authoritative RDAP with unknowns preserved | Real authorized DNS/TLS/registrar coverage; no DNS/certificate/domain mutations |
+| AI Advisor | Provider interface, Groq adapter, evidence guard, scoped cache, global retained budget, per-provider backoff; historical nine live cases accepted | New complex semantic holdouts are simulated so far; prepared live runner defaults to approval-required; model quality/general safety are not established by contract tests |
+| Customer identity/isolation | Local accounts, salted password hashing, private durable sessions/site ownership and domain-control proofs | Real deployment/TLS, signup/recipient policies, account recovery/email verification and deletion/privacy workflow require closure before commercial access; they are not claimed complete |
+| WordPress AutoFix | Exact broken-anchor replacement in post/page content: explicit session-bound approval, verified encrypted backup, conditional apply/verify/rollback and separate reviewed restore | Companion is nonproduction/test-only. Production compatibility profile, supported editor/plugin hooks and live permission/rollback validation remain unresolved. General metadata/plugin/builder repair and full-site restore are not implemented |
+| Monitoring | Four-module scheduling, durable reservations/leases, verified resolution scopes, failure isolation, history/inbox and email outbox; no automatic model/repair execution | Oracle worker activation and sustained real operation require approval; live email delivery remains unvalidated |
+| External recovery | B2 mounted; owner-confirmed zero-dollar caps; notification API reported not enabled; owner independently recovered master fixture; real Oracle AI-ledger encrypted backup/fresh restore verified | This was one SQLite database, not full future customer state or WordPress/VM recovery. Keep private manifest/key custody, review current headroom before future writes, then validate newly provisioned full state |
+| Oracle runtime | Existing Always Free host installed/hardened/reboot-tested previously; private storage and inactive units | Installed application snapshot predates recent development. Current source install, explicit fresh account/site/monitor bootstrap, current root activation approval and controlled startup remain unperformed |
+| Billing/commercial launch | Deferred by the owner's instruction until technical validation | Payment/Merchant-of-Record integration, customer terms/privacy/retention and launch review are not implemented/approved by this technical batch |
+
+## New development closing identifiable pre-live gaps
+
+The old public UI/Scanner `requests` path is replaced by the existing verified
+HTTPS transport/Scanner. No DNS precheck followed by an ambient reconnect remains
+in that default public workflow. Redirects/partial framing, oversized bodies,
+private targets and write methods fail closed. WordPress candidates use existing
+published-resource validators and a single bounded suggestion-stage budget;
+reachability never grants repair permission. Explicit injected fixture readers
+remain available for tests; they are not deployment bypasses.
+
+`test_prelaunch_system_flow.py` combines identification, simulated evidence advice,
+owner-only review/approval, verified encrypted fixture backup, conditional repair,
+four-module monitoring with a temporary API fault, later resolution, fresh-login
+manual restore and rediscovery. Another customer stays isolated. It is a new
+cross-component scenario, not another external Groq/B2 or customer-site test.
+
+`validate_complex_advisor.py` prepares at most five new synthetic admissions using
+the existing configured advisor/ledger only after explicit opt-in. Private durable
+attempt/result receipts prevent blind repeat of a lost result. Contract/relevance,
+coverage or safety failure stops the run. Completed original fixtures are not in
+this suite. Human semantic validation stays false even when observable gates pass.
+
+## Readiness conclusion
+
+Offline implementation/test evidence supports the explicitly bounded capabilities
+above. It does not remove any production gate. The product cannot be declared
+finished or commercially ready while account/commercial workflows, production
+WordPress compatibility, mandatory live validations and controlled deployment
+remain incomplete. The controlled plan lists those decisions without silently
+adding capabilities or weakening security to turn them green.

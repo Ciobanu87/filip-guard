@@ -136,6 +136,8 @@ class SecureMonitoringScan:
                     raw=_https_request_exchange(target,path,timeout,headers=(('User-Agent','FilipGuardMonitor/0.1'),),
                         accept='text/html,application/xhtml+xml')
                     response=parse_http_response(raw)
+                    if response.status==206 or 300<=response.status<400:
+                        raise ValueError('Partial responses and redirects are blocked')
                     if len(response.body)>MAX_BYTES:raise ValueError('Monitoring page too large')
                     types=[v for k,v in response.headers if k=='content-type']
                     if len(types)>1:raise ValueError('Ambiguous monitoring content type')

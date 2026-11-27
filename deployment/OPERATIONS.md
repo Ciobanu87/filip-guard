@@ -1,4 +1,7 @@
-# Authorized infrastructure setup — not deployed
+# Authorized infrastructure setup — services held
+
+Current scope/gaps: [release matrix](../RELEASE_READINESS.md).
+Prepared, unexecuted steps: [controlled release plan](CONTROLLED_RELEASE_PLAN.md).
 
 Current host preparation/status (2026-11-27): see
 [`oracle-prepared/README.md`](oracle-prepared/README.md). Pinned Oracle SSH,

@@ -3,16 +3,28 @@ FILIP GUARD – Professional website scanner for broken links, SEO issues, and w
 
 ## Development status
 
-The scanner and Advisor are beta features. Advisor recommendations are fixed
-SEO rules and text templates; no AI model is connected. AutoFix and authenticated
-WordPress requests remain disabled. Offline preparation does not authorize a
-remote edit or prove that WordPress permissions have been verified.
+Current development and launch-gate status is maintained in
+[the release readiness matrix](RELEASE_READINESS.md) and
+[the controlled Oracle test/install plan](deployment/CONTROLLED_RELEASE_PLAN.md).
+The four approved read-only guards, authenticated account/site isolation,
+monitoring and optional evidence-constrained AI Advisor are implemented.
+Groq is the current provider; its accepted historical live cases are preserved.
+WordPress content repair/restore is integrated only for explicitly authorized
+isolated `.test` environments. Production customer repairs remain blocked.
+New development is not automatically installed on Oracle; services stay held.
+
+The public development Scanner uses verified DNS-pinned HTTPS, bounded reads
+and no redirects. Plain HTTP is intentionally rejected. Deterministic rules and
+reviewed templates remain available when model access is disabled or invalid.
+These statements do not claim complete model reasoning, broad WordPress plugin
+compatibility, a whole-site backup or production launch readiness.
 
 Offline approvals require a high-entropy `session_id` supplied by the trusted
 server session at issuance and preparation. Never accept that identifier or the
 `trusted_authorization` flag as proof of authorization from a client. Existing
 approval databases are migrated automatically; unbound old approvals are rejected
-and must be reissued. Session binding does not implement login or session expiry.
+and must be reissued. This low-level session binding alone does not implement login or expiry; the
+authenticated customer flow uses the separate CustomerAuth integration.
 
 ## Independent backup recovery
 
@@ -31,11 +43,11 @@ content after deleting the original database. This is database recovery only;
 remote WordPress rollback is implemented and tested only in isolated fixtures;
 production activation remains blocked.
 
-Before commercial launch, the project still needs scanner transport hardening,
-production login/session integration and approved repair UI, durable encrypted
-external storage/key custody, wider WordPress compatibility validation, and a
-separate production activation review. Monitoring follows validation of those
-components. No production launch has been performed.
+Before commercial launch, the remaining live/operational, WordPress compatibility,
+account recovery and commercial gates in RELEASE_READINESS.md must be closed.
+No production launch has been performed. The sections below retain the scope
+and limitations of individual components; older fixture descriptions are not
+a claim that the later provider/custody milestones were undone.
 
 ## AutoFix development integration (isolated fixture)
 
@@ -79,9 +91,10 @@ decrypts and verifies an independent recovery copy before reporting success.
 It rejects wrong keys, modified data, unexpected object digests and existing
 output paths. Recovery files are created with private permissions.
 
-No actual external provider, credentials, backup schedule, retention policy or
-production key custody has been configured. Tests use an in-memory object store
-and ephemeral random keys. Deployment needs private durable external storage, an
+The content-backup tests described here use an in-memory object store and
+ephemeral keys. Separately, B2 configuration, owner key custody and a manual
+Oracle AI-ledger encrypted recovery have been verified. Scheduled backups and
+actual customer WordPress content recovery remain disabled/unvalidated. Deployment needs private durable external storage, an
 independently retained encryption key, a saved nonsecret export receipt and an
 operator-tested recovery procedure. These archives cover saved resource content,
 not themes, plugins, uploads, configuration or the complete WordPress database.
@@ -96,7 +109,8 @@ from a trusted server callback and never written to the repair journal. Requests
 are bounded; redirects and automatic retries are forbidden. A lost response is
 reported as an uncertain result, never as a successful repair or permission to
 retry. The legacy adapter, public authentication entry and default engine gateway
-remain disabled; this candidate is not connected to the client UI.
+remain disabled for customer production sites; the candidate is connected only
+to the isolated authenticated test workspace.
 
 `wordpress_companion/filip-guard-companion.php` implements the matching candidate
 REST endpoint for posts/pages. It is disabled by default and refuses production

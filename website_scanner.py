@@ -1,7 +1,7 @@
 """Shared existing website scanner, usable without importing the Streamlit app.
 
-Default interactive behavior is preserved. Monitoring injects a bounded,
-DNS-pinned HTTPS reader and a stricter initial validator.
+Public reads use the existing DNS-pinned HTTPS transport. Monitoring injects
+its own shared deadline/request budget. Explicit fixture readers remain injectable.
 """
 import ipaddress
 import socket
@@ -37,35 +37,8 @@ def validate_url(value, host=None):
 
 
 def fetch(url, host, method='GET'):
-    # No automatic redirects: validate each destination, including DNS resolution.
-    current = url
-    for _ in range(5):
-        validate_url(current, host)
-        r = requests.request(method, current, headers=HEADERS, timeout=(4, 8), allow_redirects=False, stream=True)
-        if r.status_code in (301, 302, 303, 307, 308) and r.headers.get('Location'):
-            next_url = urljoin(current, r.headers['Location'])
-            r.close()
-            current = next_url
-            continue
-        if method == 'HEAD':
-            status = r.status_code
-            r.close()
-            return status, current, ''
-        if 'text/html' not in r.headers.get('Content-Type', '').lower():
-            r.close()
-            return r.status_code, current, ''
-        data = bytearray()
-        for chunk in r.iter_content(chunk_size=16384):
-            data.extend(chunk)
-            if len(data) > MAX_BYTES:
-                r.close()
-                raise ValueError('Page too large')
-        encoding = r.encoding or 'utf-8'
-        result = bytes(data).decode(encoding, errors='replace')
-        status = r.status_code
-        r.close()
-        return status, current, result
-    raise ValueError('Too many redirects')
+    from public_scan_workflow import secure_public_fetch
+    return secure_public_fetch(url,host,method)
 
 
 def normalize_link(base, href, host):
@@ -81,7 +54,10 @@ def normalize_link(base, href, host):
 def scan(start, limit, *, fetcher=None, initial_validator=None, max_links=100, max_discovered=None, link_observer=None, context_observer=None):
     if not urlparse(start).scheme:
         start = 'https://' + start
-    (initial_validator or validate_url)(start)
+    if initial_validator is None and fetcher is None:
+        from monitoring_scan import target_url
+        target_url(start)
+    else:(initial_validator or validate_url)(start)
     get = fetch if fetcher is None else fetcher
     host = urlparse(start).hostname.lower()
     queue = deque([start])
