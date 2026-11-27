@@ -82,9 +82,17 @@ class GroqProviderTests(unittest.TestCase):
             keyfile=Path(root)/'key';keyfile.write_text(KEY);keyfile.chmod(0o600)
             env={'FG_AI_AUTHORIZED':'1','FG_AI_PROVIDER':'groq-free','FG_GROQ_API_KEY_FILE':str(keyfile),
                  'FG_AI_FREE_PLAN_CONFIRMED':'1','FG_AI_CLOUD_DATA_CONSENT':'1','FG_AI_LEDGER_DB':str(Path(root)/'ledger.sqlite')}
-            ContextualAdvisor(env['FG_AI_LEDGER_DB'],self.provider())  # Explicit provisioning, not runtime recovery.
+            provisioned=ContextualAdvisor(env['FG_AI_LEDGER_DB'],self.provider())  # Explicit fixture provisioning only.
+            with provisioned.db() as db:
+                db.execute('CREATE TABLE advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
+                db.execute('INSERT INTO advisor_budget VALUES (1,19)')
+            before=Path(env['FG_AI_LEDGER_DB']).read_bytes()
+
             with patch.dict(os.environ,env,clear=True),patch('advisor_groq.cloud_exchange') as network:
                 engine=configured_advisor();self.assertEqual(engine.provider.name,'groq-free');network.assert_not_called()
+            self.assertTrue(engine.require_existing_ledger)
+            self.assertEqual(Path(env['FG_AI_LEDGER_DB']).read_bytes(),before)
+            with provisioned.db() as db:self.assertEqual(db.execute('SELECT calls FROM advisor_budget WHERE day=1').fetchone()[0],19)
     def test_oversized_cloud_context_is_blocked_before_key_access_or_network(self):
         keys=Mock(return_value=KEY)
         provider=GroqFreeProvider(keys,free_plan_confirmed=True,data_consent=True)
