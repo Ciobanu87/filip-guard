@@ -78,9 +78,10 @@ def host_gate(environ=None):
         raise ValueError('State path cannot traverse symlinks')
     if (STATE / 'FG-RESTORE-REVIEW-REQUIRED').exists():
         raise ValueError('Recovered state requires reconciliation')
-    from runtime_state import require_existing_guard_state, require_existing_database
+    from runtime_state import require_existing_guard_state
+    from advisor_ledger import require_existing_advisor_ledger
     require_existing_guard_state(env)
-    require_existing_database(STATE / 'advisor.sqlite', {'advisor_requests', 'advisor_budget'})
+    require_existing_advisor_ledger(STATE / 'advisor.sqlite')
     return approval
 
 

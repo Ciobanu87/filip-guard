@@ -1,14 +1,22 @@
 # Authorized infrastructure setup — not deployed
 
-Current host preparation/status (2026-11-26): see
-[`oracle-prepared/README.md`](oracle-prepared/README.md). The earlier real B2
-synthetic encrypted recovery succeeded and is not repeated here. Pinned Oracle
-SSH, read-only readiness, accepted owner Oracle evidence, actual host runtime
-installation, SSH hardening and controlled reboot/persistence validation succeeded.
-Host-level full-state recovery/key custody and application service/backup activation
-remain pending; installed units/timer are disabled. Historical
-"not configured/validated" statements below describe the original preparation,
-not a reversal of those completed B2 checks.
+Current host preparation/status (2026-11-27): see
+[`oracle-prepared/README.md`](oracle-prepared/README.md). Pinned Oracle SSH,
+readiness, owner Always Free evidence, runtime installation, SSH hardening and
+controlled reboot/persistence validation succeeded. Independent owner master-key
+custody was verified. A single encrypted backup of the existing AI-ledger SQLite
+state was uploaded to B2 and recovered into a new private held directory with
+byte-identical data; the source stayed unchanged. The notification-read API
+returned the provider's exact `API not enabled` feature-gate response, not an
+invented empty rule list. No notification rule was changed or enabled.
+
+Application services and the backup timer remain disabled/inactive. The manual
+SQLite recovery proof does not establish full WordPress/VM recovery or launch
+readiness. The development ledger-integrity changes described in
+`../CONTEXTUAL_ADVISOR.md` are source changes only; they do not update the installed
+Oracle application or activate any service. Historical "not configured/validated"
+statements below describe the original preparation, not a reversal of the
+completed provider and custody checks.
 
 All code stays on `filip-guard-development`. Production AutoFix remains blocked.
 This runbook configures existing components; it does not provision accounts,

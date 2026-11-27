@@ -165,3 +165,27 @@ human approval of SEO wording and authorized integrated hosting/provider setup.
 The real WordPress UI job still uses simulated AI responses; real Groq evidence
 selection was tested separately in Colab. This engine is not declared final or
 ready for launch.
+
+
+## Existing-ledger integrity before runtime inference
+
+Runtime configuration now requires the existing request, daily-budget and provider
+cooldown tables. A missing day counter, a counter below surviving reservations,
+invalid numeric usage, malformed cooldown timing, unsafe file permissions or a
+restore-review marker blocks inference without creating/reconstructing counters.
+Larger conservative historical holds remain valid and unchanged. Missing history
+must be restored or explicitly reconciled by an operator, never reset to zero.
+
+The same reservation-history validation runs inside the inference transaction,
+before cache reuse, quota migration, readiness checks or a new reservation. This
+also catches loss after initial process configuration. Explicit disposable fixture
+provisioning retains the development constructor; configured runtime always uses
+the existing-ledger mode. These checks do not change the budget ceiling, model,
+provider, cloud-data consent or accepted historical quality evaluations.
+
+The authenticated application keeps deterministic Scanner recommendations
+available with a safe `usage-ledger-unavailable` status. Private exception details
+are not persisted or displayed. Customer/site authorization remains required even
+when the model is blocked. This is operational reliability and budget integrity,
+not new model-quality evidence or a grant of repair authority. Tests use simulated
+providers and private temporary databases; no provider calls are needed.

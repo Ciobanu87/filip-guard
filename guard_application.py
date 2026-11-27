@@ -151,12 +151,20 @@ class GuardApplication:
             db.execute('CREATE TABLE IF NOT EXISTS application_advice (scan_id TEXT PRIMARY KEY,result TEXT NOT NULL)')
             old=db.execute('SELECT result FROM application_advice WHERE scan_id=?',(scan['scan_id'],)).fetchone()
         if not generate:return render_language(json.loads(old[0]) if old else rule_result(scan['report']['rows'],contexts),language)
+        from advisor_ledger import AdvisorLedgerError
+        result=None
         try:engine=advisor if advisor is not None else configured_advisor()
+        except AdvisorLedgerError:
+            engine=None;result=rule_result(scan['report']['rows'],contexts,status='usage-ledger-unavailable')
         except Exception:engine=None
-        if engine is None:result=rule_result(scan['report']['rows'],contexts,status='model-not-configured')
+        if engine is None:
+            if result is None:result=rule_result(scan['report']['rows'],contexts,status='model-not-configured')
         else:
-            result=engine.analyze(scan['report']['rows'],contexts,scope=principal.customer_id+':'+site_id,
-                checkpoint=lambda:self._owned(session,site_id))
+            try:
+                result=engine.analyze(scan['report']['rows'],contexts,scope=principal.customer_id+':'+site_id,
+                    checkpoint=lambda:self._owned(session,site_id))
+            except AdvisorLedgerError:
+                result=rule_result(scan['report']['rows'],contexts,status='usage-ledger-unavailable')
         self._owned(session,site_id)
         with self.db(session,site_id) as db:
             db.execute('INSERT OR REPLACE INTO application_advice VALUES (?,?)',(scan['scan_id'],json.dumps(result)))

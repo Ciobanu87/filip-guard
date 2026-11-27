@@ -147,3 +147,41 @@ class AdvisorEvaluationTests(unittest.TestCase):
         self.assertEqual(sum(x['candidate_topic_specific'] for x in report['cases']),4)
         for case in report['cases']:
             for metric in ('correct_detected_problem','draft_grounded_or_abstained','unsupported_autofix_blocked','missing_business_context_explicit'):self.assertTrue(case[metric])
+
+
+class RuntimeLedgerIntegrationTests(unittest.TestCase):
+    def setUp(self):
+        import sqlite3
+        self.temp=tempfile.TemporaryDirectory();self.addCleanup(self.temp.cleanup)
+        self.path=Path(self.temp.name)/'runtime.sqlite';self.provider=SimulatedProvider()
+        ContextualAdvisor(self.path,self.provider)
+        with sqlite3.connect(self.path) as db:
+            db.execute('CREATE TABLE advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
+
+    def test_configured_engine_preserves_ledger_and_requires_runtime_validation(self):
+        before=self.path.read_bytes()
+        env={'FG_AI_AUTHORIZED':'1','FG_AI_PROVIDER':'ollama-local','FG_AI_LEDGER_DB':str(self.path)}
+        with patch.dict('os.environ',env,clear=True),patch('contextual_advisor.OllamaProvider',return_value=self.provider):
+            engine=configured_advisor()
+        self.assertTrue(engine.require_existing_ledger)
+        self.assertEqual(self.provider.calls,0);self.assertEqual(before,self.path.read_bytes())
+
+    def test_configured_partial_ledger_cannot_recreate_budget(self):
+        import sqlite3
+        with sqlite3.connect(self.path) as db:db.execute('DROP TABLE advisor_budget')
+        before=self.path.read_bytes()
+        env={'FG_AI_AUTHORIZED':'1','FG_AI_PROVIDER':'ollama-local','FG_AI_LEDGER_DB':str(self.path)}
+        with patch.dict('os.environ',env,clear=True),patch('contextual_advisor.OllamaProvider',return_value=self.provider),self.assertRaises(ValueError):
+            configured_advisor()
+        self.assertEqual(self.provider.calls,0);self.assertEqual(before,self.path.read_bytes())
+
+    def test_live_counter_loss_blocks_even_previously_cached_advice(self):
+        import sqlite3
+        from advisor_ledger import AdvisorLedgerError
+        engine=ContextualAdvisor(self.path,self.provider,require_existing_ledger=True)
+        self.assertEqual(engine.analyze(ROWS,CONTEXT,scope=SCOPE)['status'],'model-assisted')
+        self.assertEqual(self.provider.calls,1)
+        with sqlite3.connect(self.path) as db:db.execute('DELETE FROM advisor_budget')
+        before=self.path.read_bytes()
+        with self.assertRaises(AdvisorLedgerError):engine.analyze(ROWS,CONTEXT,scope=SCOPE)
+        self.assertEqual(self.provider.calls,1);self.assertEqual(self.path.read_bytes(),before)

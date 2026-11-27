@@ -78,9 +78,9 @@ class HostApprovalTests(unittest.TestCase):
         with patch.object(gate, 'read_root_file', return_value=json.dumps(approval())), \
              patch.object(gate, 'validate_approval', return_value=approval()), \
              patch('runtime_state.require_existing_guard_state'), \
-             patch('runtime_state.require_existing_database', side_effect=ValueError('missing original ledger')) as ledger:
+             patch('advisor_ledger.require_existing_advisor_ledger', side_effect=ValueError('missing original ledger')) as ledger:
             with self.assertRaises(ValueError): gate.host_gate(env)
-        ledger.assert_called_once_with(gate.STATE / 'advisor.sqlite', {'advisor_requests', 'advisor_budget'})
+        ledger.assert_called_once_with(gate.STATE / 'advisor.sqlite')
 
 
 class BackupLifecycleTests(unittest.TestCase):

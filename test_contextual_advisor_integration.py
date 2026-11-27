@@ -53,3 +53,24 @@ class AuthenticatedAdvisorIntegrationTests(unittest.TestCase):
         with patch('contextual_advisor.configured_advisor',return_value=None):
             result=self.f.application.advice(self.f.a,self.f.site_a,self.scan['scan_id'],generate=True)
         self.assertEqual(result['status'],'model-not-configured');self.assertTrue(all(x['source']=='rules' for x in result['recommendations']))
+
+    def test_ledger_failure_preserves_readonly_scanner_advice_without_inference(self):
+        from advisor_ledger import AdvisorLedgerError
+        with patch('contextual_advisor.configured_advisor',side_effect=AdvisorLedgerError('private operational detail')):
+            result=self.f.application.advice(self.f.a,self.f.site_a,self.scan['scan_id'],generate=True)
+        self.assertEqual(result['status'],'usage-ledger-unavailable')
+        self.assertTrue(all(x['source']=='rules' and x['autofix'] is False for x in result['recommendations']))
+        self.assertNotIn('private operational detail',json.dumps(result))
+        self.assertEqual(self.provider.calls,0)
+        self.assertEqual(self.f.application.advice(self.f.a,self.f.site_a,self.scan['scan_id']),result)
+
+    def test_live_ledger_failure_does_not_bypass_customer_scope(self):
+        from advisor_ledger import AdvisorLedgerError
+        engine=unittest.mock.Mock()
+        engine.analyze.side_effect=AdvisorLedgerError('private detail')
+        with self.assertRaises(PermissionError):
+            self.f.application.advice(self.f.b,self.f.site_a,self.scan['scan_id'],generate=True,advisor=engine)
+        engine.analyze.assert_not_called()
+        result=self.f.application.advice(self.f.a,self.f.site_a,self.scan['scan_id'],generate=True,advisor=engine)
+        self.assertEqual(result['status'],'usage-ledger-unavailable')
+        self.assertNotIn('private detail',json.dumps(result))

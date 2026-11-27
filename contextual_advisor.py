@@ -100,9 +100,13 @@ def validate_selection(payload,bundle,facts,base,model):
 
 
 class ContextualAdvisor:
-    def __init__(self,database,provider,*,daily_calls=20,timeout=15,max_output_tokens=1200,clock=time.time):
+    def __init__(self,database,provider,*,daily_calls=20,timeout=15,max_output_tokens=1200,clock=time.time,require_existing_ledger=False):
         if type(daily_calls) is not int or not 1<=daily_calls<=100 or not 1<=timeout<=20 or not 64<=max_output_tokens<=1600:
             raise ValueError('Bounded inference configuration required')
+        self.require_existing_ledger=require_existing_ledger
+        if require_existing_ledger:
+            from advisor_ledger import require_existing_advisor_ledger
+            require_existing_advisor_ledger(database)
         self.path=private_database(database);self.provider=provider
         self.daily_calls,self.timeout,self.tokens,self.clock=daily_calls,timeout,max_output_tokens,clock
         with self.db() as db:
@@ -129,6 +133,9 @@ class ContextualAdvisor:
         digest=hashlib.sha256(fingerprint.encode()).hexdigest();now=self.clock();day=int(now//86400)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            if self.require_existing_ledger:
+                from advisor_ledger import validate_budget_history
+                validate_budget_history(db)
             provider_key=self.provider.name+':'+self.provider.model
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             if old and old[0]>now and old[1]=='complete':
@@ -223,15 +230,8 @@ def configured_advisor():
     else:raise ValueError('Unreviewed model provider')
     # Runtime configuration must never recreate a lost budget as a fresh ledger.
     # Explicit development provisioning still uses ContextualAdvisor directly.
-    from pathlib import Path
-    ledger=Path(os.environ['FG_AI_LEDGER_DB'])
-    if ledger.is_symlink() or not ledger.is_file():
-        raise ValueError('AI usage ledger missing; restore/reconcile history before enabling inference')
-    try:
-        with sqlite3.connect(ledger.resolve().as_uri()+'?mode=ro',uri=True) as db:
-            db.execute('SELECT scope,request_hash,started,expires,day,state,result FROM advisor_requests LIMIT 0')
-    except sqlite3.Error:
-        raise ValueError('AI usage ledger invalid; no automatic budget initialization') from None
+    from advisor_ledger import require_existing_advisor_ledger
+    require_existing_advisor_ledger(os.environ['FG_AI_LEDGER_DB'])
     daily=int(os.environ.get('FG_AI_DAILY_CALLS','20'))
     if kind=='groq-free' and daily>20:raise ValueError('Cloud free-test daily limit cannot exceed 20')
-    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,daily_calls=daily)
+    return ContextualAdvisor(os.environ['FG_AI_LEDGER_DB'],provider,daily_calls=daily,require_existing_ledger=True)
