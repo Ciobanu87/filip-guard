@@ -185,3 +185,23 @@ class RuntimeLedgerIntegrationTests(unittest.TestCase):
         before=self.path.read_bytes()
         with self.assertRaises(AdvisorLedgerError):engine.analyze(ROWS,CONTEXT,scope=SCOPE)
         self.assertEqual(self.provider.calls,1);self.assertEqual(self.path.read_bytes(),before)
+
+    def test_disappearing_live_ledger_is_never_recreated(self):
+        from advisor_ledger import AdvisorLedgerError
+        engine=ContextualAdvisor(self.path,self.provider,require_existing_ledger=True)
+        self.path.unlink()
+        with self.assertRaises(AdvisorLedgerError):engine.analyze(ROWS,CONTEXT,scope=SCOPE)
+        self.assertFalse(self.path.exists());self.assertEqual(self.provider.calls,0)
+
+    def test_restore_hold_added_after_startup_blocks_live_engine(self):
+        from advisor_ledger import AdvisorLedgerError
+        engine=ContextualAdvisor(self.path,self.provider,require_existing_ledger=True)
+        (self.path.parent/'FG-RESTORE-REVIEW-REQUIRED').write_text('hold')
+        before=self.path.read_bytes()
+        with self.assertRaises(AdvisorLedgerError):engine.analyze(ROWS,CONTEXT,scope=SCOPE)
+        self.assertEqual(self.provider.calls,0);self.assertEqual(self.path.read_bytes(),before)
+
+    def test_runtime_constructor_never_calls_development_bootstrap(self):
+        with patch('contextual_advisor.private_database',side_effect=AssertionError('no bootstrap')):
+            ContextualAdvisor(self.path,self.provider,require_existing_ledger=True)
+        self.assertEqual(self.provider.calls,0)

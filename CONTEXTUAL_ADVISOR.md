@@ -189,3 +189,10 @@ are not persisted or displayed. Customer/site authorization remains required eve
 when the model is blocked. This is operational reliability and budget integrity,
 not new model-quality evidence or a grant of repair authority. Tests use simulated
 providers and private temporary databases; no provider calls are needed.
+
+Every runtime connection also checks the existing private file and restore hold,
+then uses SQLite `mode=rw` rather than its create-if-missing default. Runtime
+construction skips development schema bootstrap entirely. A ledger disappearing
+or being placed under a recovery hold after startup therefore cannot create an
+empty replacement or issue a new request. The transactional history check remains
+necessary after the file preflight so admission validates the locked snapshot.

@@ -107,8 +107,10 @@ class ContextualAdvisor:
         if require_existing_ledger:
             from advisor_ledger import require_existing_advisor_ledger
             require_existing_advisor_ledger(database)
-        self.path=private_database(database);self.provider=provider
+        self.path=str(database) if require_existing_ledger else private_database(database)
+        self.provider=provider
         self.daily_calls,self.timeout,self.tokens,self.clock=daily_calls,timeout,max_output_tokens,clock
+        if require_existing_ledger:return
         with self.db() as db:
             advisor_quota.install(db)
             db.execute('''CREATE TABLE IF NOT EXISTS advisor_requests (
@@ -116,9 +118,17 @@ class ContextualAdvisor:
             day INTEGER NOT NULL,state TEXT NOT NULL,result TEXT,PRIMARY KEY(scope,request_hash))''')
     @contextmanager
     def db(self):
-        db=sqlite3.connect(self.path,timeout=5)
+        if self.require_existing_ledger:
+            from advisor_ledger import require_existing_advisor_ledger,AdvisorLedgerError
+            require_existing_advisor_ledger(self.path)
+            try:db=sqlite3.connect(Path(self.path).resolve().as_uri()+'?mode=rw',uri=True,timeout=5)
+            except sqlite3.Error:raise AdvisorLedgerError('Existing AI usage ledger unavailable') from None
+        else:db=sqlite3.connect(self.path,timeout=5)
         try:
             with db:yield db
+        except sqlite3.Error:
+            if self.require_existing_ledger:raise AdvisorLedgerError('AI usage ledger transaction unavailable') from None
+            raise
         finally:db.close()
     def analyze(self,rows,contexts,*,scope,checkpoint=lambda:None,language='en'):
         import re
