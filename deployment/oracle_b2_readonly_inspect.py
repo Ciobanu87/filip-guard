@@ -3,13 +3,19 @@ import base64,json,os,pwd,re,resource,runpy,stat
 from pathlib import Path
 import requests
 
+PHASE="preflight"
+CALLS=0
+HTTP_STATUS=None
 
 def main():
+    global PHASE,CALLS,HTTP_STATUS
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+    PHASE='custody-and-service-hold'
     helper=runpy.run_path('/usr/local/sbin/filip-guard-master-custody')
     if helper['status']().get('independent_owner_custody_verified') is not True:
         raise ValueError('Verified owner custody required')
     settings=helper['held_configuration']()
+    PHASE='existing-private-credential-mount'
     path=Path('/etc/filip-guard/secrets/s3.json')
     info=helper['private'](path,owner=pwd.getpwnam('filipguard').pw_uid)
     if stat.S_IMODE(info.st_mode)!=0o400 or info.st_size>8192:raise ValueError('Private existing credentials required')
@@ -20,15 +26,19 @@ def main():
     session=requests.Session();session.trust_env=False
     def get(url,authorization,params=None):
         nonlocal calls
-        calls+=1
+        global CALLS,HTTP_STATUS
+        calls+=1;CALLS=calls
         if calls>2:raise ValueError('Bounded read-only request count exceeded')
         with session.get(url,headers={'Authorization':authorization},params=params,timeout=(5,10),allow_redirects=False,stream=True) as response:
+            HTTP_STATUS=response.status_code
             if response.status_code!=200:raise ValueError('Read-only permission or free cap prevents metadata read')
             raw=response.raw.read(65537)
             if len(raw)>65536:raise ValueError('Bounded response required')
             return json.loads(raw)
     try:
+        PHASE='native-account-authorization'
         auth=get('https://api.backblazeb2.com/b2api/v4/b2_authorize_account','Basic '+base64.b64encode((key+':'+secret).encode()).decode())
+        PHASE='native-authorization-schema'
         storage=auth['apiInfo']['storageApi'];allowed=storage['allowed']
         capabilities=allowed['capabilities'];buckets=allowed['buckets']
         report={'status':'b2-read-only-metadata-inspected','b2_api_calls':calls,'groq_api_calls':0,'services_started':False,
@@ -45,7 +55,9 @@ def main():
         url=storage['apiUrl']
         if not re.fullmatch(r'https://api[0-9]+\.backblazeb2\.com',url):raise ValueError('Official TLS API origin required')
         bucket_id=matches[0]['id']
+        PHASE='read-existing-notification-rules'
         result=get(url+'/b2api/v4/b2_get_bucket_notification_rules',auth['authorizationToken'],{'bucketId':bucket_id})
+        PHASE='notification-response-schema'
         entries=result if isinstance(result,list) else [result]
         if len(entries)!=1 or entries[0].get('bucketId')!=bucket_id:raise ValueError('Unexpected notification response')
         rules=entries[0]['eventNotificationRules']
@@ -58,5 +70,4 @@ def main():
 if __name__=='__main__':
     try:print(json.dumps(main(),sort_keys=True))
     except Exception:
-        print('{"status":"b2-read-only-inspection-held","services_started":false,"secret_values_printed":false,"automatic_retries":0}')
-        raise SystemExit(1)
+        print(json.dumps({'status':'b2-read-only-inspection-held','phase':PHASE,'b2_api_calls':CALLS,'last_http_status':HTTP_STATUS,'services_started':False,'secret_values_printed':False,'automatic_retries':0},sort_keys=True))
