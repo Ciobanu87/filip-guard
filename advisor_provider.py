@@ -1,4 +1,7 @@
-"""Replaceable provider contract. Opt-in local Ollama; no cloud billing/API keys."""
+"""Shared provider interface and existing opt-in local adapter; no auto activation.
+
+Groq transport/credentials live in advisor_groq. Runtime selection is explicit.
+"""
 import http.client
 import json
 import re

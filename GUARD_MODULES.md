@@ -119,3 +119,20 @@ still fail before connection. Hostname/TLS verification, DNS pinning, redirects,
 response bounds, method/body restrictions and authorization checks are unchanged.
 A wire-level regression test now exercises the actual transport validator and
 checks anonymous GET/no-cookie behavior. No accepted Groq case is repeated.
+
+
+## Failure isolation and shared deadline
+
+The composite runner now retains already verified Website/module observations
+when another trusted module fails unexpectedly. That run is partial; no verified
+scope is invented for the failed check, and private exception text is not added
+to the report. Other enabled modules may continue within the existing shared
+budget. A shared deadline stops further module processing and excludes late
+results. Authentication cancellation and lease fencing still propagate.
+
+A module result must match the module's static registry identity before it can
+contribute resolution scope. Tests exercise all four guards together through the
+existing scheduler/history/notification pipeline, then recover the observed
+Website, product-metadata and API issues without requesting AI, applying repairs
+or leaking a synthetic response secret to another customer. Separate fault tests
+cover unexpected exceptions, late results, mislabeled modules and cancellation.

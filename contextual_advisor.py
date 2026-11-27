@@ -156,11 +156,11 @@ class ContextualAdvisor:
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             if old and old[0]>now and old[1]=='complete':
                 checkpoint();return render_language(json.loads(old[2]),language)
-            if self.provider.name=='groq-free':
+            if getattr(self.provider,'legacy_quota_recovery',False):
                 advisor_quota.migrate_legacy(db,provider_key)
-                cooldown=advisor_quota.active(db,provider_key,now)
-                if cooldown:
-                    return render_language({**fallback,'status':'provider-cooldown','cooldown':cooldown,'diagnostic':cooldown['diagnostic'],'cache_origin':'provider-backoff'},language)
+            cooldown=advisor_quota.active(db,provider_key,now)
+            if cooldown:
+                return render_language({**fallback,'status':'provider-cooldown','cooldown':cooldown,'diagnostic':cooldown['diagnostic'],'cache_origin':'provider-backoff'},language)
             old=db.execute('SELECT expires,state,result FROM advisor_requests WHERE scope=? AND request_hash=?',(scope,digest)).fetchone()
             old_quota=bool(old and old[2] and advisor_quota.is_quota(json.loads(old[2]).get('diagnostic')))
             old_key_error=bool(old and old[2] and is_credential_failure(json.loads(old[2]).get('diagnostic')))

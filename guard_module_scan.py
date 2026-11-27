@@ -36,8 +36,9 @@ class GuardModuleScan:
         base=MonitoringReport((),(),(),(),(),True,0)
         if settings['website']:
             try:
-                base=self.website(origin,page_limit=page_limit,max_requests=max_requests,
-                                  before_request=reserve,checkpoint=bounded_checkpoint)
+                candidate=self.website(origin,page_limit=page_limit,max_requests=max_requests,
+                                       before_request=reserve,checkpoint=bounded_checkpoint)
+                bounded_checkpoint();base=candidate
             except MonitoringCancelled:raise
             except Exception:base=replace(base,complete=False)
         context=self.network_factory(origin,before_request=reserve,checkpoint=bounded_checkpoint,
@@ -45,13 +46,23 @@ class GuardModuleScan:
         checks=[];findings=list(base.findings);scope=set(base.scope);complete=base.complete
         for name,runner in REGISTRY.items():
             if name not in settings:continue
-            for check in runner(context,settings[name]):
-                checkpoint();checks.append(check.as_dict())
-                if check.status in ('pass','fail'):scope.add((name+':'+check.code,check.url))
-                else:complete=False
-                if check.status=='fail':
-                    if len(findings)<200:findings.append(check.finding())
+            try:
+                for check in runner(context,settings[name]):
+                    bounded_checkpoint()
+                    if check.module!=name:raise ValueError('Module result must match its trusted registry entry')
+                    checks.append(check.as_dict())
+                    if check.status in ('pass','fail'):scope.add((name+':'+check.code,check.url))
                     else:complete=False
+                    if check.status=='fail':
+                        if len(findings)<200:findings.append(check.finding())
+                        else:complete=False
+            except MonitoringCancelled:raise
+            except MonitoringLimit:
+                complete=False;break
+            except Exception:
+                checkpoint();complete=False
+        try:bounded_checkpoint()
+        except MonitoringLimit:complete=False
         checkpoint()
         return replace(base,findings=tuple(findings),scope=tuple(sorted(scope)),complete=complete,
                        requests=count,module_checks=tuple(checks))
