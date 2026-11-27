@@ -1,0 +1,8 @@
+{
+  "scope": "verified-owner-export-observation-with-no-history-artifact-or-identifiers-in-github",
+  "source_sha256": "4404ca2f0fa9c56482d012816a058d62c860bc553d30a018764a6820265bdaa8",
+  "maximum_new_provider_attempts": 1,
+  "automatic_retries": 0,
+  "original_csv_retained_in_owner_upload": true,
+  "services_started": false
+}

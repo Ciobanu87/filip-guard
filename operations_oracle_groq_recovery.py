@@ -19,6 +19,8 @@ data=json.loads(sys.stdin.buffer.read(2*1024*1024+1))
 if json.loads((config/'host-install-receipt.json').read_text())['evidence_sha256']!=data['evidence_sha256']:raise ValueError('Wrong approved host')
 if json.loads((config/'ssh-recovery/pending.json').read_text())['status']!='confirmed':raise ValueError('SSH not confirmed')
 authorization=data['authorization']
+if data['mode']=='reconcile-verified-observation' and authorization.get('metadata_publication_authorized') is not True:
+    raise ValueError('Owner metadata publication approval required')
 if (authorization['maximum_new_provider_attempts']!=1 or authorization['automatic_retries']!=0
     or authorization['paid_services_authorized'] is not False or authorization['application_master_key_operations'] is not False
     or authorization['systemd_service_activation'] is not False or authorization['free_plan_owner_confirmed'] is not True):
@@ -41,21 +43,10 @@ if data['mode']=='prepare':
             out.write(private.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()));out.flush();os.fsync(out.fileno())
     public=private.public_key().public_bytes(serialization.Encoding.PEM,serialization.PublicFormat.SubjectPublicKeyInfo).decode()
     print(json.dumps({'status':'private-recovery-transfer-prepared','public_key_pem':public,'groq_calls':0,'master_key_operations':0,'services_started':False}))
-elif data['mode']=='reconcile-uploaded-export':
-    # Safer owner-upload route: no provider-history data enters GitHub.
-    upload=Path('/home/opc/groq-provider-usage.csv')
-    if not upload.exists() and not upload.is_symlink():
-        print(json.dumps({'status':'awaiting-owner-private-csv-upload','groq_api_calls':0,'services_started':False}));raise SystemExit(0)
-    fd=os.open(upload,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
-    try:
-        info=os.fstat(fd)
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid!=pwd.getpwnam('opc').pw_uid
-            or stat.S_IMODE(info.st_mode)!=0o600 or info.st_nlink!=1 or info.st_size>1024*1024):
-            raise ValueError('Private regular owner upload required')
-        with os.fdopen(fd,'rb',closefd=False) as source_file:raw=source_file.read(1024*1024+1)
-    finally:os.close(fd)
-    if hashlib.sha256(raw).hexdigest()!=authorization['source_sha256']:raise ValueError('Uploaded CSV differs from owner-reviewed export')
-    payload={'csv_base64':base64.b64encode(raw).decode(),'historical_evidence':data['historical_evidence'],
+elif data['mode']=='reconcile-verified-observation':
+    # No original/encrypted provider-history artifact crosses GitHub. The full
+    # private CSV remains in the owner's independently retained original upload.
+    payload={'verified_observation':data['verified_observation'],'historical_evidence':data['historical_evidence'],
              'one_synthetic_probe_authorized':True}
     user=pwd.getpwnam('filipguard')
     # Source is public operator code; all private evidence goes only to stdin.
@@ -125,21 +116,24 @@ def validate_probe_authorization(data):
               'source_sha256':'4404ca2f0fa9c56482d012816a058d62c860bc553d30a018764a6820265bdaa8',
               'maximum_new_provider_attempts':1,'automatic_retries':0,'model':'qwen/qwen3.8-27b','maximum_output_tokens':64,
               'free_plan_owner_confirmed':True,'paid_services_authorized':False,'systemd_service_activation':False,
-              'application_master_key_operations':False,'new_cloud_resources':False,'repeat_nine_accepted_cases':False}
+              'application_master_key_operations':False,'new_cloud_resources':False,'repeat_nine_accepted_cases':False,
+              'metadata_publication_authorized':True,'metadata_publication_branch':'filip-guard-development',
+              'original_csv_publication_authorized':False,'api_key_publication_authorized':False}
     if any(type(data.get(k)) is not type(v) or data.get(k)!=v for k,v in expected.items()):
         raise ValueError('Current owner one-call scope required separately from historical host-only approval')
 
 
 def main():
-    if sys.argv[1:] not in (['prepare'],['reconcile-uploaded-export']):raise ValueError('Explicit operator mode required')
+    if sys.argv[1:] not in (['prepare'],['reconcile-verified-observation']):raise ValueError('Explicit operator mode required')
     evidence=(ROOT/'deployment/oracle-prepared/owner-evidence-20261126.json').read_bytes()
     approved=validate_authorization(json.loads((ROOT/'deployment/oracle-host-setup-request.json').read_text()),evidence,os.environ)
     authorization=json.loads((ROOT/'deployment/oracle-groq-controlled-validation-request.json').read_text())
     validate_probe_authorization(authorization)
     payload={'mode':sys.argv[1],'evidence_sha256':approved['evidence_sha256'],'authorization':authorization}
-    if sys.argv[1]=='reconcile-uploaded-export':
+    if sys.argv[1]=='reconcile-verified-observation':
         payload['source']=(ROOT/'groq_usage_reconciliation.py').read_text()
-        payload['historical_evidence']={'accepted_case_count': 9, 'all_nine_fixture_results_preserved': True, 'source': 'owner-nine-case-historical-summary-retained-independently', 'original_summary_sha256': '0a9f993f45026b080a09558a8742614fbc5830b5fa0c8964ccef9bb7160ed562', 'ledger_reconstructed': False, 'original_quality_cache_restored': False}
+        payload['verified_observation']={'source_sha256': '4404ca2f0fa9c56482d012816a058d62c860bc553d30a018764a6820265bdaa8', 'exported_at_utc': 1795767543.0, 'window_days': 7, 'scope': 'Default Project; one exported API-key identifier; not other projects or organizations', 'utc_day': '2026-11-24', 'requests': 15, 'http_200': 14, 'http_429': 1, 'input_tokens': 3062, 'output_tokens': 836, 'total_tokens': 3898, 'per_request_original_retained_independently': True, 'operator_verified_original_csv': True}
+        payload['historical_evidence']={'accepted_case_count': 9, 'all_nine_fixture_results_preserved': True, 'source': 'owner-nine-case-historical-summary-retained-independently', 'ledger_reconstructed': False, 'original_quality_cache_restored': False}
     report=json.loads(run_pinned_command('sudo -n -- /opt/filip-guard/.venv/bin/python -c '+shlex.quote(REMOTE),operation='host-setup',input_data=json.dumps(payload).encode(),timeout=150))
     print(json.dumps(report,sort_keys=True))
 

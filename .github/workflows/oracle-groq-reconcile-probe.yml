@@ -2,7 +2,7 @@ name: Oracle reconcile owner history and one authorized synthetic Groq probe
 on:
   push:
     branches: [filip-guard-development]
-    paths: [deployment/oracle-groq-private-upload-request.json]
+    paths: [deployment/oracle-groq-verified-observation-request.json]
 permissions:
   contents: read
 concurrency:
@@ -22,10 +22,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Check private owner upload then reconcile and reserve at most one synthetic provider attempt
+      - name: Import verified data-minimized observation then reserve at most one synthetic provider attempt
         env:
           FG_OCI_HOST_SETUP_AUTHORIZED: '1'
           FG_OCI_HOST: ${{ secrets.FG_OCI_HOST }}
           FG_OCI_HOST_ED25519_SHA256: ${{ secrets.FG_OCI_HOST_ED25519_SHA256 }}
           FG_OCI_SSH_PRIVATE_KEY: ${{ secrets.FG_OCI_SSH_PRIVATE_KEY }}
-        run: python operations_oracle_groq_recovery.py reconcile-uploaded-export
+        run: python operations_oracle_groq_recovery.py reconcile-verified-observation

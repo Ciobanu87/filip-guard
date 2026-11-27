@@ -87,6 +87,64 @@ def import_history(db, raw, *, now):
             'quality_cache_reconstructed':False,'source_sha256':SOURCE_SHA,'reconciliation_verified':True}
 
 
+
+def verified_daily_observation(raw):
+    rows,days=parse_export(raw)
+    return {'source_sha256':SOURCE_SHA,'exported_at_utc':EXPORTED_AT,'window_days':7,
+            'scope':'Default Project; one exported API-key identifier; not other projects or organizations',
+            'utc_day':'2026-11-24','requests':len(rows),'http_200':sum(row[2]==200 for row in rows),
+            'http_429':sum(row[2]==429 for row in rows),'input_tokens':sum(row[6] for row in rows),
+            'output_tokens':sum(row[7] for row in rows),'total_tokens':sum(row[6]+row[7] for row in rows),
+            'per_request_original_retained_independently':True,'operator_verified_original_csv':True}
+
+
+def import_verified_observation(db, observation, *, now):
+    # The original CSV was verified offline against its pinned hash by the
+    # operator. Only an aggregate already present in the reviewed public code
+    # crosses Actions; no request/key/project IDs or per-request times do.
+    expected={'source_sha256':SOURCE_SHA,'exported_at_utc':EXPORTED_AT,'window_days':7,
+              'scope':'Default Project; one exported API-key identifier; not other projects or organizations',
+              'utc_day':'2026-11-24','requests':15,'http_200':14,'http_429':1,
+              'input_tokens':3062,'output_tokens':836,'total_tokens':3898,
+              'per_request_original_retained_independently':True,'operator_verified_original_csv':True}
+    if observation!=expected:raise ValueError('Different aggregate requires original-source verification')
+    if int(now//86400)!=int(EXPORTED_AT//86400) or not 0<=now-EXPORTED_AT<=6*3600:
+        raise ValueError('Stale observation cannot initialize current-day counters')
+    source_day=int(datetime(2026,11,24,tzinfo=timezone.utc).timestamp()//86400)
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        db.execute('CREATE TABLE IF NOT EXISTS advisor_requests (scope TEXT NOT NULL,request_hash TEXT NOT NULL,started REAL NOT NULL,expires REAL NOT NULL,day INTEGER NOT NULL,state TEXT NOT NULL,result TEXT,PRIMARY KEY(scope,request_hash))')
+        db.execute('CREATE TABLE IF NOT EXISTS advisor_budget (day INTEGER PRIMARY KEY,calls INTEGER NOT NULL)')
+        db.execute('CREATE TABLE IF NOT EXISTS recovered_provider_daily (source_sha256 TEXT NOT NULL,day INTEGER NOT NULL,requests INTEGER NOT NULL,http_200 INTEGER NOT NULL,http_429 INTEGER NOT NULL,input_tokens INTEGER NOT NULL,output_tokens INTEGER NOT NULL,PRIMARY KEY(source_sha256,day))')
+        row=(SOURCE_SHA,source_day,15,14,1,3062,836)
+        old=db.execute('SELECT * FROM recovered_provider_daily WHERE source_sha256=? AND day=?',(SOURCE_SHA,source_day)).fetchone()
+        if old is not None and tuple(old)!=row:raise ValueError('Conflicting existing recovery evidence')
+        db.execute('INSERT OR IGNORE INTO recovered_provider_daily VALUES (?,?,?,?,?,?,?)',row)
+        db.execute('CREATE TABLE IF NOT EXISTS ai_recovery_policy (day INTEGER PRIMARY KEY,source_sha256 TEXT NOT NULL,provider_requests_exact INTEGER NOT NULL,local_reservations_recovered INTEGER NOT NULL,closed_day_budget_hold INTEGER NOT NULL)')
+        import advisor_quota
+        advisor_quota.install(db)
+        # Unknown historical cooldown: conservatively anchor the existing
+        # 24-hour policy at the END of its observed UTC day, never shorten an
+        # already retained deadline and never claim this is a provider reset.
+        advisor_quota.record(db,'groq-free:'+MODEL,(source_day+1)*86400+20,
+                             {'code':'http_error','stage':'http','http_status':429,'quota_kind':'unknown'})
+        today=int(now//86400);first=int((EXPORTED_AT-7*86400)//86400)
+        for day in range(first,today+1):
+            exact=15 if day==source_day else 0
+            hold=DAILY_CALLS if day<today else exact
+            existing=db.execute('SELECT count(*) FROM advisor_requests WHERE day=?',(day,)).fetchone()[0]
+            db.execute('INSERT INTO advisor_budget VALUES (?,?) ON CONFLICT(day) DO UPDATE SET calls=MAX(calls,excluded.calls)',(day,max(hold,existing)))
+            db.execute('INSERT OR IGNORE INTO ai_recovery_policy VALUES (?,?,?,0,?)',(day,SOURCE_SHA,exact,int(day<today)))
+        db.commit()
+    except Exception:db.rollback();raise
+    if tuple(db.execute('SELECT * FROM recovered_provider_daily WHERE source_sha256=? AND day=?',(SOURCE_SHA,source_day)).fetchone())!=row:
+        raise ValueError('Imported aggregate mismatch')
+    if db.execute('PRAGMA quick_check').fetchone()!=('ok',):raise ValueError('Reconciled ledger integrity failure')
+    return {**observation,'provider_requests_accounted':15,'original_sqlite_recovered':False,
+            'historical_local_reservations_unknown':True,'closed_historical_days_held_at_existing_call_cap':True,
+            'quality_cache_reconstructed':False,'evidence_representation':'verified-daily-observation-with-original-retained-independently',
+            'reconciliation_verified':True}
+
 def retain(path, raw):
     if path.exists():
         if path.is_symlink() or path.read_bytes()!=raw:raise ValueError('Different retained recovery evidence')
@@ -160,11 +218,9 @@ def single_probe(db, recovery, key_path, *, now, exchange=None):
 
 
 def run_host(data):
-    import base64
     os.umask(0o077)
     if os.geteuid()==0:raise ValueError('Application uid required')
-    raw=base64.b64decode(data['csv_base64'],validate=True)
-    parse_export(raw)
+    observation=data['verified_observation']
     now=time.time()
     if int(now//86400)!=int(EXPORTED_AT//86400) or not 0<=now-EXPORTED_AT<=6*3600:
         raise ValueError('Stale export cannot initialize current-day counters')
@@ -192,7 +248,7 @@ def run_host(data):
                 finally:snapshot.close()
                 backup_path.chmod(0o600)
         finally:original.close()
-    retain(recovery/'groq-provider-history-20261127.csv',raw)
+    retain(recovery/'groq-provider-observation-20261127.json',json.dumps(observation,sort_keys=True).encode())
     retain(recovery/'groq-nine-accepted-historical-evidence.json',json.dumps(evidence,sort_keys=True).encode())
     # Publish a newly reconstructed ledger only after its history and counters
     # are verified. A failed import never leaves an empty production database.
@@ -204,7 +260,7 @@ def run_host(data):
             temporary_db=sqlite3.connect(staged)
             try:
                 temporary_db.execute('PRAGMA synchronous=FULL')
-                import_history(temporary_db,raw,now=time.time())
+                import_verified_observation(temporary_db,observation,now=time.time())
             finally:temporary_db.close()
             os.link(staged,path)  # atomic publication, refusing any concurrent target
             directory=os.open(state,os.O_RDONLY|os.O_DIRECTORY)
@@ -214,7 +270,7 @@ def run_host(data):
     db=sqlite3.connect(path,timeout=10);path.chmod(0o600)
     try:
         db.execute('PRAGMA synchronous=FULL')
-        report=import_history(db,raw,now=time.time())
+        report=import_verified_observation(db,observation,now=time.time())
         retain(recovery/'groq-provider-reconciliation-v1.json',json.dumps(report,sort_keys=True).encode())
         if data.get('one_synthetic_probe_authorized') is not True:raise ValueError('Single probe authorization missing')
         probe=single_probe(db,recovery,Path('/etc/filip-guard/secrets/groq-api-key'),now=time.time())

@@ -105,6 +105,39 @@ class CurrentOwnerAuthorizationTests(unittest.TestCase):
         from operations_oracle_groq_recovery import validate_probe_authorization
         data=json.loads(Path('deployment/oracle-groq-controlled-validation-request.json').read_text())
         validate_probe_authorization(data)
-        for name,value in [('maximum_new_provider_attempts',2),('automatic_retries',1),('paid_services_authorized',True),('application_master_key_operations',True),('systemd_service_activation',True)]:
+        for name,value in [('metadata_publication_authorized',False),('maximum_new_provider_attempts',2),('automatic_retries',1),('paid_services_authorized',True),('application_master_key_operations',True),('systemd_service_activation',True)]:
             altered=dict(data);altered[name]=value
             with self.assertRaises(ValueError):validate_probe_authorization(altered)
+
+class MinimizedObservationRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.raw=fixture();self.patch=patch.object(recovery,'SOURCE_SHA',hashlib.sha256(self.raw).hexdigest());self.patch.start()
+        self.observation=recovery.verified_daily_observation(self.raw);self.db=sqlite3.connect(':memory:')
+    def tearDown(self):self.db.close();self.patch.stop()
+    def imported(self):return recovery.import_verified_observation(self.db,self.observation,now=recovery.EXPORTED_AT+60)
+    def test_original_verification_emits_no_private_identifiers_or_request_times(self):
+        text=json.dumps(self.observation)
+        for private in ('fixture-key-id','fixture-project-id','req_fixture','created_at'):
+            self.assertNotIn(private,text)
+        self.assertEqual(self.observation['total_tokens'],3898)
+    def test_minimized_import_does_not_fabricate_cached_requests(self):
+        report=self.imported()
+        self.assertTrue(report['reconciliation_verified'])
+        self.assertEqual(self.db.execute('SELECT requests,http_200,http_429,input_tokens,output_tokens FROM recovered_provider_daily').fetchall(),[(15,14,1,3062,836)])
+        self.assertEqual(self.db.execute('SELECT count(*) FROM advisor_requests').fetchone()[0],0)
+        self.assertFalse(report['original_sqlite_recovered'])
+    def test_existing_counters_and_request_history_are_preserved(self):
+        self.imported();today=int(recovery.EXPORTED_AT//86400)
+        self.db.execute('UPDATE advisor_budget SET calls=9 WHERE day=?',(today,))
+        self.db.execute('UPDATE advisor_budget SET calls=37 WHERE day=?',(today-3,))
+        self.db.execute("INSERT INTO advisor_requests VALUES ('prior','prior',1,2,3,'failed','preserved')");self.db.commit()
+        self.imported()
+        self.assertEqual(self.db.execute('SELECT calls FROM advisor_budget WHERE day=?',(today,)).fetchone()[0],9)
+        self.assertEqual(self.db.execute('SELECT calls FROM advisor_budget WHERE day=?',(today-3,)).fetchone()[0],37)
+        self.assertEqual(self.db.execute("SELECT result FROM advisor_requests WHERE scope='prior'").fetchone()[0],'preserved')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM recovered_provider_daily').fetchone()[0],1)
+    def test_modified_or_stale_observation_creates_no_current_day_allowance(self):
+        altered=dict(self.observation);altered['requests']=14
+        for item,now in ((altered,recovery.EXPORTED_AT+60),(self.observation,recovery.EXPORTED_AT+7*3600)):
+            with self.assertRaises(ValueError):recovery.import_verified_observation(self.db,item,now=now)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM sqlite_master').fetchone()[0],0)

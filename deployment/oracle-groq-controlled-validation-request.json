@@ -14,5 +14,14 @@
   "application_master_key_operations": false,
   "new_cloud_resources": false,
   "repeat_nine_accepted_cases": false,
-  "private_transfer_key_purpose": "encrypt-owner-history-in-transit-and-at-rest-only-not-authentication-or-master-key-custody"
+  "private_transfer_key_purpose": "encrypt-owner-history-in-transit-and-at-rest-only-not-authentication-or-master-key-custody",
+  "metadata_publication_authorized": true,
+  "metadata_publication_branch": "filip-guard-development",
+  "metadata_publication_fields": [
+    "totals",
+    "dates",
+    "source_sha256"
+  ],
+  "original_csv_publication_authorized": false,
+  "api_key_publication_authorized": false
 }

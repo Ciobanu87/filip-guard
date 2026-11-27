@@ -14,35 +14,48 @@ local timestamps cannot be recovered from this CSV. The nine prior accepted
 results are separately retained as historical evidence, not rerun or fabricated
 into cache rows. No claim of original-SQLite reconstruction is made.
 
-Reconciliation preserves any existing ledger (with a prior snapshot), exact
-request rows in a separate recovery table and any higher existing budgets.
+Reconciliation preserves any existing ledger (with a prior snapshot), its
+request rows and any higher existing budgets. The selected minimized route
+imports a daily observation, with original request rows retained independently.
 An empty/new ledger is published atomically only after a verified import.
 Every elapsed UTC day touched by this export is held at the existing local cap
 of 20 calls, or a higher existing count. These labeled conservative **holds are
 not claims of actual calls**; they prevent refunding unknown historical local
 reservations. The current day imports the exported request count, retaining any
-higher current local counter. Counters never decrease. The original CSV remains private on the host and in the owner upload;
-the complete nine-case evidence remains in the independently retained owner
-summary, with only a hash reference retained on Oracle. Prior cooldowns are retained; the historical 429 receives the
+higher current local counter. Counters never decrease. The complete original CSV and nine-case evidence remain in the independently
+retained owner uploads; only the verified daily observation and hash references
+are retained on Oracle. Prior cooldowns are retained; the historical 429 receives the
 existing conservative unknown-expiry policy anchored to its actual timestamp.
 No fresh reset time or organization-wide remaining-token number is inferred.
 
 The owner-history ciphertext was NOT published. Automatic approval rejected a
-durable repository destination in place of the previously authorized one-day
-artifact. The selected safer route contains no provider-history data in GitHub:
-the owner sends the original CSV privately from Cloud Shell through existing,
-previously host-verified SSH to `/home/opc/groq-provider-usage.csv` (mode 0600).
-Actions supplies public recovery code only. On Oracle the root controller reads
-that private local file with no-follow/owner/mode/link/size checks and validates
-its exact SHA-256 before any import or call. Missing input returns
-`awaiting-owner-private-csv-upload` with zero API calls. The original full
-nine-case summary remains independently retained by the owner; Oracle stores
-only its SHA-256 reference and preservation status, not a fabricated cache.
-A temporary private RSA transport key from preparation remains root-only on
-Oracle and is not used by this direct-upload route. It is not an application
-master key, API key or SSH identity. No custody or authentication operation on
-those keys is performed by the upload route. Neither the Groq credential nor
-provider history is supplied to GitHub; no public endpoint/resource is created.
+durable repository artifact instead of the previously authorized one-day
+artifact. No workaround publishes that history or its encrypted form.
+
+A data-minimized alternative needs no history transfer: the operator verifies
+the owner's original CSV locally against the pinned SHA-256 and derives only
+the aggregate counts already documented above, its UTC day, scope/window and
+source hash. The original per-request CSV remains independently retained in the
+owner's original uploaded file. No actual request IDs, API-key identifiers,
+project identifiers, individual request timestamps or encrypted dataset enter
+GitHub. The server imports a clearly labeled operator-verified daily observation,
+not original request rows. Original full historical evidence remains with the
+owner; only its hash reference and preservation status are retained on Oracle.
+
+`import_verified_observation` validates the exact reviewed observation, prevents
+counter decreases and enforces the same conservative closed-day holds. A
+historical unknown cooldown is anchored conservatively at the END of its observed
+UTC day before applying the existing 24-hour policy. Longer retained cooldowns
+are never shortened. The complete source can be rechecked against its SHA-256;
+no claim of a complete original SQLite/cache, pre-network reservations, other
+projects or organization-wide usage is introduced by this minimized baseline.
+
+The direct owner-SSH upload route remains a fallback prepared in the previous
+commit, not a prerequisite for the data-minimized observation. A temporary RSA
+transfer key created in preparation remains root-only and unused by this route;
+it is not an application master key, API key or SSH identity. Neither the Groq
+credential nor original provider history is supplied to GitHub. No public
+endpoint, paid service, resource or credential access is created.
 
 After import integrity and totals pass, the one-shot probe:
 
@@ -71,3 +84,8 @@ ledger. Networking is audit-blocked; private key readiness is checked only in
 memory; missing customer cloud consent must block construction; budget/request
 counters must be byte-for-value unchanged. This is offline integration, not a
 second provider call or application-service activation.
+
+On 2026-11-27 the owner explicitly authorized publication of totals, dates and
+the CSV SHA-256 on filip-guard-development. This approval excludes the original
+CSV, request/key/project identifiers and API-key material. The operator manifest
+records this specific publication scope separately from the one-call permission.
