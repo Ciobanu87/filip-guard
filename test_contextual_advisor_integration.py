@@ -74,3 +74,19 @@ class AuthenticatedAdvisorIntegrationTests(unittest.TestCase):
         result=self.f.application.advice(self.f.a,self.f.site_a,self.scan['scan_id'],generate=True,advisor=engine)
         self.assertEqual(result['status'],'usage-ledger-unavailable')
         self.assertNotIn('private detail',json.dumps(result))
+
+    def test_simultaneous_issues_stay_owner_bound_without_repair_authority(self):
+        application=self.f.application;original=application.scanner
+        def scanner(origin,**kwargs):
+            report=original(origin,**kwargs)
+            rows=[{**row,'title':'','meta_description':'','h1_count':2,'images_missing_alt':2} for row in report.rows]
+            return make_report(rows,report.broken,[],report.requests,page_context=dict(report.page_context))
+        application.scanner=scanner
+        scan=application.scan(self.f.a,self.f.site_a,start_url=self.f.origins[0]+'/source/',page_limit=1)
+        result=application.advice(self.f.a,self.f.site_a,scan['scan_id'],generate=True,advisor=self.engine)
+        self.assertEqual(result['status'],'model-assisted')
+        self.assertEqual(len(result['recommendations']),4)
+        self.assertTrue(all(not item['autofix'] and not item['repair_supported'] and not item['root_cause_verified'] for item in result['recommendations']))
+        self.assertEqual(application.history(self.f.a,self.f.site_a),[])
+        with self.assertRaises(PermissionError):application.advice(self.f.b,self.f.site_a,scan['scan_id'])
+        self.assertEqual(self.provider.calls,1)

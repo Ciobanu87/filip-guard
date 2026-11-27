@@ -13,6 +13,10 @@ def render_language(result,language='en'):
     for item in output['recommendations']:
         label,cause,impact,solution=RO[item['problem']]
         item['language']=language;item['language_source']='reviewed-templates'
+        from advisor_quality import safe_seo_excerpt
+        if item.get('seo_draft') and not safe_seo_excerpt(item['seo_draft']):
+            item['seo_draft']=None
+            item['draft_withheld_reason']='unsafe-extractive-content'
         item['root_cause_verified']=False
         # Irrelevant uncertainty is not useful page context. This rendering also
         # applies to existing accepted results without calling a model again.
@@ -23,11 +27,13 @@ def render_language(result,language='en'):
             item['impact']=impact;item['reason']=impact;item['solution']=solution
             if item['source']=='model-assisted' and item['evidence']:
                 quote=item['evidence'][0]['text'];item['reason']+=' Dovadă observată: „'+quote+'”'
-                item['solution']+=' Verifică relevanța pentru subiectul observat: „'+quote+'”'
+                if safe_seo_excerpt(quote):item['solution']+=' Verifică relevanța pentru subiectul observat: „'+quote+'”'
             item['priority_reason']='Prioritatea ține cont de problema detectată și de dovezi; impactul asupra afacerii nu este cunoscut.'
             item['risk']='Necesită verificare umană. Textul paginii este o sursă neconfirmată; nu sunt garantate rezultate SEO.'
             item['approval']='Recomandare informativă; reparațiile suportate necesită aprobare explicită separată.'
         else:
+            if not safe_seo_excerpt(item['solution']):
+                item['solution']='Review '+item['problem']+' against verified page content before proposing any separately approved change.'
             item['problem_label']=item['problem']
             item['cause']='Scanner observed this condition: '+item['problem']+'. The underlying technical cause is not established.'
             item['impact']=item['reason'].split(' Observed page evidence:')[0]
@@ -58,9 +64,10 @@ def review_steps(item, language='en'):
     """
     if language not in ('en','ro'):
         raise ValueError('Supported advice language required')
+    from advisor_quality import safe_seo_excerpt
     quote=next((fact.get('text','') for fact in item.get('evidence',[])
                 if fact.get('kind')=='content' and len(fact.get('text',''))>=20
-                and '[redacted]' not in fact.get('text','')),None)
+                and '[redacted]' not in fact.get('text','') and safe_seo_excerpt(fact.get('text',''))),None)
     problem=item['problem']
     ro=language=='ro'
     if problem in ('Missing SEO title','Missing meta description'):

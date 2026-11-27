@@ -41,19 +41,23 @@ image purposes or unavailable content. You cannot authorize or execute changes.'
 
 def rule_result(rows,contexts=None,*,status='rules'):
     bundle,facts,base=evidence_bundle(rows,contexts)
+    from advisor_quality import has_page_content
     result=[]
     for item in base:
         evidence=[f for key,f in facts.items() if key.startswith(item['page_id']+'e')][:3]
         result.append({**item,'source':'rules','model':'','evidence':evidence,
-            'priority_reason':item['reason'],'missing_information':['business_goal_unknown','audience_unknown'],
+            'priority_reason':item['reason'],'missing_information':sorted({'business_goal_unknown','audience_unknown'}|({'content_unavailable'} if not has_page_content(item,facts) else set())|({'image_purpose_unknown'} if item['problem']=='Images missing ALT text' else set())),
             'seo_draft':None,'repair_supported':False,'approval':'Informational only; supported link repairs use separate explicit approval.',
             'autofix':False})
     # Preserve every original rule recommendation even beyond model batch limits.
     from ai_advisor import analyze_pages
     all_rules=analyze_pages(rows)
-    for item in all_rules[len(base):]:
-        result.append({**item,'source':'rules','model':'','evidence':[], 'priority_reason':item['reason'],
-            'missing_information':['content_unavailable'],'seo_draft':None,'repair_supported':False,
+    for index,item in enumerate(all_rules[len(base):],start=len(base)):
+        observed=[clean(text,240) for text in (contexts or {}).get(item['page'],[])[:5]]
+        observed=[text for text in observed if text]
+        evidence=[{'id':'r'+str(index)+'e'+str(number),'kind':'content','text':text} for number,text in enumerate(observed[:3])]
+        result.append({**item,'source':'rules','model':'','evidence':evidence, 'priority_reason':item['reason'],
+            'missing_information':sorted({'business_goal_unknown','audience_unknown'}|({'content_unavailable'} if not observed else set())|({'image_purpose_unknown'} if item['problem']=='Images missing ALT text' else set())),'seo_draft':None,'repair_supported':False,
             'approval':'Informational only; no model approval.','autofix':False})
     return {'status':status,'recommendations':result,'response_contract_validated':False,'prompt_version':VERSION}
 
@@ -83,14 +87,16 @@ def validate_selection(payload,bundle,facts,base,model):
         evidence=[facts[k] for k in ids]
         if not evidence and 'content_unavailable' not in missing:raise AdvisorFailure('evidence_missing')
         if draft is not None:
+            from advisor_quality import safe_seo_excerpt
             if (item['problem'] not in ('Missing SEO title','Missing meta description') or type(draft) is not str
-                    or not 20<=len(draft)<=160 or '[redacted]' in draft or clean(draft,160)!=draft
+                    or not 20<=len(draft)<=160 or '[redacted]' in draft or clean(draft,160)!=draft or not safe_seo_excerpt(draft)
                     or not any(draft in e['text'] and e['kind'] in ('title','content') for e in evidence)):
                 raise AdvisorFailure('draft_unsupported')
         quote=evidence[0]['text'] if evidence else 'No usable public page text was observed.'
         reason=item['reason']+' Observed page evidence: “'+quote+'”'
         solution=item['solution']
-        if evidence:solution+=' Review the page topic represented by “'+quote+'”; confirm it describes the primary content.'
+        from advisor_quality import safe_seo_excerpt
+        if evidence and safe_seo_excerpt(quote):solution+=' Review the page topic represented by “'+quote+'”; confirm it describes the primary content.'
         result.append({**item,'reason':reason,'solution':solution,'priority':selected['priority'],
             'priority_reason':'Review priority for '+selected['focus']+' based on the detected issue and quoted page evidence; business impact is not known.',
             'risk':item['risk']+' Page text is untrusted and sampled; a human must verify relevance.',

@@ -4,7 +4,7 @@ Cloud constrained decoding gets the exact IDs, priority floor and available
 choices for each finding. No free-form draft, guessed focus or invented ID.
 """
 from advisor_diagnostics import AdvisorFailure
-from advisor_quality import eligible_evidence,has_page_content
+from advisor_quality import eligible_evidence,has_page_content,safe_seo_excerpt
 VERSION='indexed-evidence-v3'
 
 
@@ -54,7 +54,7 @@ def normalize(payload,base,facts,focuses):
         if not has_page_content(item,facts) and 'content_unavailable' not in missing:missing.append('content_unavailable')
         fact=facts.get(identifier);draft=None
         if (choice['include_draft'] and fact and item['problem'] in ('Missing SEO title','Missing meta description')
-                and fact['kind'] in ('title','content') and 20<=len(fact['text'])<=160 and '[redacted]' not in fact['text']):
+                and fact['kind'] in ('title','content') and 20<=len(fact['text'])<=160 and '[redacted]' not in fact['text'] and safe_seo_excerpt(fact['text'])):
             draft=fact['text']
         output.append({'finding_id':item['finding_id'],'evidence_ids':[identifier] if identifier else [],
             'priority':choice['priority'],'focus':focuses[item['problem']],'missing_information':missing,'seo_draft':draft})
