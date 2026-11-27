@@ -64,7 +64,8 @@ def main():
         if not re.fullmatch(r'https://api[0-9]+\.backblazeb2\.com',url):raise ValueError('Official TLS API origin required')
         bucket_id=matches[0]['id']
         PHASE='read-existing-notification-rules'
-        result=get(url+'/b2api/v4/b2_get_bucket_notification_rules',auth['authorizationToken'],{'bucketId':bucket_id})
+        # Official Backblaze b2-sdk-python v2.8.1 uses this compatible read-only route.
+        result=get(url+'/b2api/v3/b2_get_bucket_notification_rules',auth['authorizationToken'],{'bucketId':bucket_id})
         PHASE='notification-response-schema'
         entries=result if isinstance(result,list) else [result]
         if len(entries)!=1 or not isinstance(entries[0],dict) or entries[0].get('bucketId',bucket_id)!=bucket_id:raise ValueError('Unexpected notification response')
