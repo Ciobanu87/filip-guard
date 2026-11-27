@@ -1,0 +1,10 @@
+{
+  "generation_requires_owner_interactive_secret": true,
+  "encrypted_github_artifact_only": true,
+  "artifact_retention_days": 1,
+  "plaintext_master_export_authorized": false,
+  "plaintext_master_library_storage_authorized": false,
+  "service_activation_authorized": false,
+  "groq_calls_authorized": 0,
+  "b2_calls_before_free_caps_verification_authorized": 0
+}

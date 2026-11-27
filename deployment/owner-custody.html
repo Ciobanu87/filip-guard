@@ -1,0 +1,93 @@
+<!doctype html><html lang="ro"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'none'; script-src 'sha256-AqXfT06pEwQeHiSk0SoxaM1pLjBZ/HsrwzR/iJYwYFA=' 'sha256-yQWttoqLWmJ/HIGZoK5eisaQlfiZRXebwBtYLjVESwE='; style-src 'sha256-BEq+IQUZBnfbomIqyEOlZsDOdIXtcWBYv6+mt4mG4tw='; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'"><title>FILIP GUARD — custodie locala</title><style>body{font:17px system-ui;max-width:720px;margin:24px auto;padding:18px;background:#f5f7fb;color:#18243a}section{background:white;padding:20px;margin:18px 0;border:1px solid #cdd6e5;border-radius:12px}input,button{font:inherit;max-width:100%;box-sizing:border-box;margin:8px 0;padding:12px}input[type=password],input[type=text]{width:100%}button{cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere}label{display:block;margin:10px 0}small{display:block}</style><body>
+<h1>FILIP GUARD — custodie independenta</h1>
+<p>Descarca acest fisier si deschide-l <strong>local pe telefonul tau</strong>. Nu il rula in previzualizarea ChatGPT sau in browserul cloud. Nu are conexiuni de retea si nu afiseaza cheia master.</p>
+<section><h2>1. Secretul tau de recuperare</h2><p>Genereaza secretul pe acest dispozitiv si pastreaza-l separat de pachetul criptat, intr-un loc privat controlat de tine. Nu il trimite in conversatii sau capturi.</p>
+<button id="generate" type="button">Genereaza secret local</button><input id="newSecret" type="password" readonly autocomplete="off" spellcheck="false" aria-label="Secret local generat"><label><input id="showSecret" type="checkbox">Afiseaza secretul numai pe dispozitivul meu</label><button id="copySecret" type="button">Copiaza secretul</button>
+<p>In sesiunea SSH proprie, comanda pregatita este:</p><pre>sudo /usr/local/sbin/filip-guard-master-custody prepare</pre><small>Introdu secretul de doua ori la prompturile ascunse. Nu pune secretul in comanda. Serviciile raman oprite.</small></section>
+<section><h2>2. Verifica recuperarea locala</h2><p>Dupa pregatirea pe Oracle, descarca pachetul de custodie strict criptat. Pastreaza-l independent de Oracle si de bucketul backupurilor. Pastreaza si o copie separata protejata a pachetului; secretul ramane separat.</p>
+<label>Pachet criptat<input id="bundle" type="file" accept=".json,application/json"></label><label>Secret de recuperare<input id="recoverySecret" type="password" autocomplete="off" spellcheck="false"></label>
+<label><input id="savedBundle" type="checkbox">Am pastrat pachetul criptat independent de server si de bucketul backupurilor.</label><label><input id="savedSecret" type="checkbox">Am pastrat secretul separat, sub controlul meu.</label>
+<button id="recover" type="button">Verifica local cheia si backupul de test</button><pre id="proof"></pre><button id="copyProof" type="button" disabled>Copiaza codul de verificare</button>
+<p>Confirma apoi in sesiunea SSH proprie:</p><pre>sudo /usr/local/sbin/filip-guard-master-custody verify-owner</pre><small>Introdu numai codul de verificare la promptul ascuns. Pana la confirmare, custodia ramane in asteptare; niciun serviciu nu se activeaza.</small></section>
+<p id="status" role="status">Niciun secret nu a fost generat sau incarcat.</p>
+<script>'use strict';
+// Local WebCrypto only. No fetch, storage, key display or raw-key export.
+(function(root) {
+const enc = new TextEncoder(), dec = new TextDecoder();
+const MAGIC = enc.encode('FILIP-GUARD-APPLICATION-STATE-v1\0');
+const hex = bytes => Array.from(new Uint8Array(bytes), b => b.toString(16).padStart(2,'0')).join('');
+const sha = async bytes => hex(await crypto.subtle.digest('SHA-256', bytes));
+function bytes64(value, max=8192) {
+  if(typeof value!=='string'||value.length>max*2||value.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(value)) throw Error('Format criptat invalid');
+  const raw=atob(value); if(raw.length>max)throw Error('Fisier prea mare');
+  return Uint8Array.from(raw,c=>c.charCodeAt(0));
+}
+function exact(obj, keys) { if(!obj||Array.isArray(obj)||typeof obj!=='object'||Object.keys(obj).sort().join('|')!==keys.slice().sort().join('|'))throw Error('Structura invalida'); }
+function concat(...parts) { const size=parts.reduce((n,p)=>n+p.length,0), out=new Uint8Array(size);let at=0;for(const p of parts){out.set(p,at);at+=p.length;}return out; }
+function generateSecret() {
+  const raw=crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...raw)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function recover(bundleBytes, secret) {
+  let master;
+  try {
+    if(!(bundleBytes instanceof Uint8Array)||bundleBytes.length>3800||!/^[-_A-Za-z0-9]{43}$/.test(secret))throw Error('Intrare invalida');
+    const bundle=JSON.parse(dec.decode(bundleBytes));
+    exact(bundle,['format','envelope','application_state_check']);
+    if(bundle.format!=='filip-guard-owner-custody-v1')throw Error('Versiune necunoscuta');
+    const e=bundle.envelope;
+    exact(e,['format','key_id','deployment_id','kdf','iterations','salt','nonce','ciphertext']);
+    if(e.format!=='filip-guard-master-envelope-v1'||e.kdf!=='PBKDF2-SHA256'||e.iterations!==600000||!/^[0-9a-f]{32}$/.test(e.deployment_id)||!/^[A-Za-z0-9_-]{1,64}$/.test(e.key_id))throw Error('Parametri criptografici invalizi');
+    const salt=bytes64(e.salt),nonce=bytes64(e.nonce),cipher=bytes64(e.ciphertext);
+    if(salt.length!==16||nonce.length!==12||cipher.length!==48)throw Error('Lungime invalida');
+    const password=await crypto.subtle.importKey('raw',enc.encode(secret),'PBKDF2',false,['deriveKey']);
+    const wrapping=await crypto.subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt,iterations:600000},password,{name:'AES-GCM',length:256},false,['decrypt']);
+    const aad=enc.encode('FILIP-GUARD/owner-master-custody/v1/'+e.key_id+'/'+e.deployment_id+'/PBKDF2-SHA256/600000');
+    master=new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM',iv:nonce,additionalData:aad,tagLength:128},wrapping,cipher));
+    if(master.length!==32)throw Error('Cheie invalida');
+    const check=bundle.application_state_check;exact(check,['manifest','ciphertext']);const m=check.manifest;
+    exact(m,['scope','deployment_id','key_id','object_id','ciphertext_sha256']);
+    const objectPattern=new RegExp('^deployments/'+e.deployment_id+'/application-state-[0-9a-f]{32}\\.aesgcm$');
+    if(m.scope!=='application_sqlite_state'||m.deployment_id!==e.deployment_id||m.key_id!==e.key_id||!objectPattern.test(m.object_id)||!/^[0-9a-f]{64}$/.test(m.ciphertext_sha256))throw Error('Manifest invalid');
+    const sealed=bytes64(check.ciphertext);
+    if(sealed.length<=MAGIC.length+28||await sha(sealed)!==m.ciphertext_sha256||!MAGIC.every((v,i)=>sealed[i]===v))throw Error('Backup corupt');
+    const hkdf=await crypto.subtle.importKey('raw',master,'HKDF',false,['deriveKey']);
+    const archiveKey=await crypto.subtle.deriveKey({name:'HKDF',hash:'SHA-256',salt:new Uint8Array(32),info:enc.encode('FILIP-GUARD/v1/application-state/'+e.deployment_id)},hkdf,{name:'AES-GCM',length:256},false,['decrypt']);
+    const archiveAAD=concat(MAGIC,enc.encode(e.deployment_id+'/'+e.key_id));
+    const plaintext=await crypto.subtle.decrypt({name:'AES-GCM',iv:sealed.slice(MAGIC.length,MAGIC.length+12),additionalData:archiveAAD,tagLength:128},archiveKey,sealed.slice(MAGIC.length+12));
+    const archive=JSON.parse(dec.decode(plaintext));exact(archive,['version','directories','files']);
+    if(archive.version!==1||!Array.isArray(archive.directories)||archive.directories.length!==0||!Array.isArray(archive.files)||archive.files.length!==1)throw Error('Backup de verificare invalid');
+    const file=archive.files[0];exact(file,['path','data','sha256']);const data=bytes64(file.data);
+    if(file.path!=='custody.sqlite'||data.length!==1024||await sha(data)!==file.sha256||dec.decode(data.slice(0,16))!=='SQLite format 3\0')throw Error('Recuperarea SQLite nu a fost verificata');
+    const challenges=Array.from(dec.decode(data).matchAll(/FG-CUSTODY-CHALLENGE:([A-Za-z0-9_-]{43})/g));
+    if(challenges.length!==1)throw Error('Dovada recuperarii lipseste');
+    const bundleSHA=await sha(bundleBytes),digest=Uint8Array.from(bundleSHA.match(/../g),s=>parseInt(s,16));
+    const proofKey=await crypto.subtle.importKey('raw',master,{name:'HMAC',hash:'SHA-256'},false,['sign']);
+    const proof=hex(await crypto.subtle.sign('HMAC',proofKey,concat(enc.encode('FG-OWNER-CUSTODY-PROOF/v1\0'),digest,enc.encode(challenges[0][1]))));
+    return {format:'filip-guard-owner-custody-proof-v1',bundle_sha256:bundleSHA,recovery_proof:proof,
+            offline_application_backup_recovery_verified:true};
+  } catch(error) { throw Error('Recuperare neverificata: secret gresit, fisier modificat sau format incompatibil. Nu introduce cheia master manual.'); }
+  finally { if(master)master.fill(0);secret=null; }
+}
+root.FGOwnerCustody=Object.freeze({generateSecret,recover});
+})(globalThis);
+</script><script>
+'use strict';
+const byId=id=>document.getElementById(id);
+function status(message){byId('status').textContent=message;}
+byId('generate').addEventListener('click',()=>{byId('newSecret').value=FGOwnerCustody.generateSecret();status('Secret generat numai pe acest dispozitiv. Salveaza-l separat, apoi introdu-l prin SSH. Nu il trimite in chat.');});
+byId('copySecret').addEventListener('click',async()=>{try{if(!byId('newSecret').value)throw Error();await navigator.clipboard.writeText(byId('newSecret').value);status('Secret copiat. Pastreaza-l separat intr-un loc privat controlat de tine.');}catch(error){status('Copierea automata nu este disponibila. Foloseste selectarea/copierea din camp pe dispozitivul tau.');}});
+byId('showSecret').addEventListener('change',()=>{byId('newSecret').type=byId('showSecret').checked?'text':'password';});
+byId('recover').addEventListener('click',async()=>{
+ byId('proof').textContent='';byId('copyProof').disabled=true;
+ if(!byId('savedBundle').checked||!byId('savedSecret').checked){status('Confirma mai intai pastrarea independenta a pachetului si secretului separat.');return;}
+ const file=byId('bundle').files[0];if(!file||file.size>3800){status('Alege pachetul criptat de custodie, maximum 3800 bytes.');return;}
+ const secret=byId('recoverySecret').value;byId('recoverySecret').value='';status('Verificare locala in curs. Nu se trimite nimic in retea.');
+ try{const receipt=await FGOwnerCustody.recover(new Uint8Array(await file.arrayBuffer()),secret);
+ byId('proof').textContent=receipt.recovery_proof;byId('copyProof').disabled=false;
+ status('RECUPERARE LOCALA VERIFICATA. Cheia master nu este afisata. Copiaza codul de verificare si introdu-l in comanda SSH verify-owner.');
+ }catch(error){status(error.message);}
+});
+byId('copyProof').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(byId('proof').textContent);status('Codul de verificare a fost copiat. Nu este cheia master.');}catch(error){status('Selecteaza si copiaza manual codul de verificare afisat.');}});
+if(window.top!==window.self||!window.isSecureContext||!crypto.subtle){byId('generate').disabled=true;byId('recover').disabled=true;status('WebCrypto nu este disponibil. Deschide fisierul descarcat LOCAL intr-un browser actualizat; nu folosi previzualizarea ChatGPT sau browserul cloud.');}
+</script></body></html>
