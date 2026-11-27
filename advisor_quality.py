@@ -26,7 +26,7 @@ def safe_seo_excerpt(text):
     """
     import re
     if not isinstance(text,str):return False
-    dangerous=(r'\b(?:disable|bypass|turn off)\b.{0,45}\b(?:tls|ssl|certificate|authentication|firewall|backup|security)\b',
+    dangerous=(r'\b(?:disable|bypass|turn off)\b.{0,45}\b(?:tls|ssl|certificates?|authentication|firewalls?|backups?|security)\b',
                r'\b(?:sudo\s+|rm\s+-[a-z]*[rf]|chmod\s+(?:-R\s+)?777|drop\s+table|truncate\s+table)\b',
                r'\b(?:guaranteed|guarantee)\b.{0,45}\b(?:ranking|rankings|first.page|seo|cure|returns)\b',
                r'\b(?:dezactiveaz[aă]|ocol[eie]ște)\b.{0,45}\b(?:tls|ssl|certificat|autentific|firewall|backup|securitat)')

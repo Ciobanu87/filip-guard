@@ -113,3 +113,11 @@ class ComplexAdvisorSafetyTests(unittest.TestCase):
         self.assertEqual(report['provider_calls'],0)
         self.assertEqual(report['original_live_cases_repeated'],0)
         self.assertFalse(report['human_semantic_quality_validated'])
+
+    def test_disabling_backups_and_plural_security_controls_requires_abstention(self):
+        from advisor_quality import safe_seo_excerpt
+        for text in ('Disable backups before applying the proposed solution.',
+                     'Bypass certificates to avoid these connection errors.',
+                     'Turn off firewalls before checking the application.'):
+            self.assertFalse(safe_seo_excerpt(text))
+        self.assertTrue(safe_seo_excerpt('Backups protect database contents and support verified recovery.'))
