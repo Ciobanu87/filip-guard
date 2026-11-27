@@ -48,7 +48,7 @@ def authorization(data):
 
 
 def main():
-    if sys.argv[1:] not in (['install-helper'],['export-sealed']):raise ValueError('Explicit owner custody operation required')
+    if sys.argv[1:] not in (['install-helper'],['export-sealed'],['status']):raise ValueError('Explicit owner custody operation required')
     authorization(json.loads((ROOT/'deployment/oracle-owner-custody-request.json').read_text()))
     evidence=(ROOT/'deployment/oracle-prepared/owner-evidence-20261126.json').read_bytes()
     approved=validate_authorization(json.loads((ROOT/'deployment/oracle-host-setup-request.json').read_text()),evidence,os.environ)
@@ -57,6 +57,12 @@ def main():
         data={'source':source,'source_sha256':hashlib.sha256(source.encode()).hexdigest(),'evidence_sha256':approved['evidence_sha256']}
         result=json.loads(run_pinned_command('sudo -n -- /opt/filip-guard/.venv/bin/python -c '+shlex.quote(INSTALL),operation='host-setup',input_data=json.dumps(data).encode(),timeout=60))
         if result.get('status')!='owner-interactive-master-custody-helper-prepared':raise ValueError('Installation unverified')
+    elif sys.argv[1]=='status':
+        result=json.loads(run_pinned_command('sudo -n -- /usr/local/sbin/filip-guard-master-custody status',operation='host-setup',timeout=60))
+        expected={'status','master_installed_private','runtime_binding_matches','independent_owner_custody_verified','groq_api_calls','b2_api_calls','services_started'}
+        if set(result)!=expected or result.get('status')!='owner-custody-status-verified':raise ValueError('Custody status not available')
+        if any(result.get(name) is not True for name in ('master_installed_private','runtime_binding_matches','independent_owner_custody_verified')):raise ValueError('Independent owner custody still pending')
+        if result.get('services_started') is not False or result.get('groq_api_calls')!=0 or result.get('b2_api_calls')!=0:raise ValueError('Read-only custody scope required')
     else:
         result=json.loads(run_pinned_command('sudo -n -- /usr/local/sbin/filip-guard-master-custody export-sealed',operation='host-setup',timeout=60))
         if result.get('status')=='encrypted-owner-custody-export':
