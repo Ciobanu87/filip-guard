@@ -1,0 +1,31 @@
+name: Oracle encrypted Groq recovery transfer preparation
+on:
+  push:
+    branches: [filip-guard-development]
+    paths: [deployment/oracle-groq-transfer-request.json]
+permissions:
+  contents: read
+concurrency:
+  group: filip-guard-oracle-host-configuration
+  cancel-in-progress: false
+jobs:
+  setup-existing-host:
+    if: github.repository == 'Ciobanu87/filip-guard' && github.ref == 'refs/heads/filip-guard-development'
+    environment: filip-guard-oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prepare server-only recovery transfer private key and return public key only
+        env:
+          FG_OCI_HOST_SETUP_AUTHORIZED: '1'
+          FG_OCI_HOST: ${{ secrets.FG_OCI_HOST }}
+          FG_OCI_HOST_ED25519_SHA256: ${{ secrets.FG_OCI_HOST_ED25519_SHA256 }}
+          FG_OCI_SSH_PRIVATE_KEY: ${{ secrets.FG_OCI_SSH_PRIVATE_KEY }}
+        run: python operations_oracle_groq_recovery.py prepare

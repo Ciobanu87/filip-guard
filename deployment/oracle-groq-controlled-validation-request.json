@@ -1,0 +1,18 @@
+{
+  "scope": "owner-export-reconciliation-then-one-synthetic-groq-key-check",
+  "authorized_on": "2026-11-27",
+  "owner_approval": "Am descărcat istoricul original Groq pentru ultimele 7 zile. Reconciliază registrul consumului AI și continuă validarea controlată a cheii instalate pe serverul Oracle, conform aprobării anterioare.",
+  "prerequisite": "verified-provider-history-import-with-no-existing-counter-reduction",
+  "source_sha256": "4404ca2f0fa9c56482d012816a058d62c860bc553d30a018764a6820265bdaa8",
+  "maximum_new_provider_attempts": 1,
+  "automatic_retries": 0,
+  "model": "qwen/qwen3.8-27b",
+  "maximum_output_tokens": 64,
+  "free_plan_owner_confirmed": true,
+  "paid_services_authorized": false,
+  "systemd_service_activation": false,
+  "application_master_key_operations": false,
+  "new_cloud_resources": false,
+  "repeat_nine_accepted_cases": false,
+  "private_transfer_key_purpose": "encrypt-owner-history-in-transit-and-at-rest-only-not-authentication-or-master-key-custody"
+}
