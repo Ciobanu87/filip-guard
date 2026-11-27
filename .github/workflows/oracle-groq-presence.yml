@@ -1,0 +1,32 @@
+name: Oracle Groq credential presence only
+on:
+  push:
+    branches: [filip-guard-development]
+    paths: [operations_oracle_groq_presence.py]
+permissions:
+  contents: read
+concurrency:
+  group: filip-guard-oracle-ssh-readonly
+  cancel-in-progress: false
+jobs:
+  pinned-ssh:
+    if: github.repository == 'Ciobanu87/filip-guard' && github.ref == 'refs/heads/filip-guard-development'
+    environment: filip-guard-oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Check credential presence metadata without reading key files or calling Groq
+        env:
+          FG_OCI_SSH_PROBE_AUTHORIZED: '1'
+          FG_OCI_HOST: ${{ secrets.FG_OCI_HOST }}
+          FG_OCI_HOST_ED25519_SHA256: ${{ secrets.FG_OCI_HOST_ED25519_SHA256 }}
+          FG_OCI_SSH_PRIVATE_KEY: ${{ secrets.FG_OCI_SSH_PRIVATE_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          FG_GROQ_API_KEY: ${{ secrets.FG_GROQ_API_KEY }}
+        run: python operations_oracle_groq_presence.py
