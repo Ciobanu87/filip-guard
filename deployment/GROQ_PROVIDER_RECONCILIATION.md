@@ -21,19 +21,28 @@ Every elapsed UTC day touched by this export is held at the existing local cap
 of 20 calls, or a higher existing count. These labeled conservative **holds are
 not claims of actual calls**; they prevent refunding unknown historical local
 reservations. The current day imports the exported request count, retaining any
-higher current local counter. Counters never decrease. The original CSV and
-nine-case evidence remain private on the host as well as independently retained
-owner uploads. Prior cooldowns are retained; the historical 429 receives the
+higher current local counter. Counters never decrease. The original CSV remains private on the host and in the owner upload;
+the complete nine-case evidence remains in the independently retained owner
+summary, with only a hash reference retained on Oracle. Prior cooldowns are retained; the historical 429 receives the
 existing conservative unknown-expiry policy anchored to its actual timestamp.
 No fresh reset time or organization-wide remaining-token number is inferred.
 
-Only public recovery code and authenticated encrypted evidence are committed.
-A dedicated RSA-3072 transfer key stays root-only 0600 on Oracle; it is neither
-an SSH identity nor an application master key. Only its public key is returned.
-The CSV/evidence travel AES-256-GCM encrypted, with the data key RSA-OAEP-SHA256
-wrapped to that server. Neither the Groq key nor a decrypting key enters GitHub.
-The existing pinned SSH transports the ciphertext; no public endpoint/resource
-is created. The Groq key is read only inside the existing unprivileged app user.
+The owner-history ciphertext was NOT published. Automatic approval rejected a
+durable repository destination in place of the previously authorized one-day
+artifact. The selected safer route contains no provider-history data in GitHub:
+the owner sends the original CSV privately from Cloud Shell through existing,
+previously host-verified SSH to `/home/opc/groq-provider-usage.csv` (mode 0600).
+Actions supplies public recovery code only. On Oracle the root controller reads
+that private local file with no-follow/owner/mode/link/size checks and validates
+its exact SHA-256 before any import or call. Missing input returns
+`awaiting-owner-private-csv-upload` with zero API calls. The original full
+nine-case summary remains independently retained by the owner; Oracle stores
+only its SHA-256 reference and preservation status, not a fabricated cache.
+A temporary private RSA transport key from preparation remains root-only on
+Oracle and is not used by this direct-upload route. It is not an application
+master key, API key or SSH identity. No custody or authentication operation on
+those keys is performed by the upload route. Neither the Groq credential nor
+provider history is supplied to GitHub; no public endpoint/resource is created.
 
 After import integrity and totals pass, the one-shot probe:
 
@@ -53,3 +62,12 @@ validates the installed candidate for this bounded synthetic request, not full
 live UI operation, email, repairs, independent key custody or automatic backups.
 Provider observations are exact within their export scope; they do not recreate
 unknown original local history. No new features or main-branch changes occur.
+
+After an accepted synthetic receipt, root adds only the reviewed nonsecret
+provider/model/free-plan settings, retaining `FG_AI_AUTHORIZED=0` and explicitly
+leaving customer cloud-data consent at zero. An isolated unprivileged process
+then constructs the actual installed advisor against the reconciled persistent
+ledger. Networking is audit-blocked; private key readiness is checked only in
+memory; missing customer cloud consent must block construction; budget/request
+counters must be byte-for-value unchanged. This is offline integration, not a
+second provider call or application-service activation.

@@ -146,7 +146,7 @@ def single_probe(db, recovery, key_path, *, now, exchange=None):
             payload=exchange(provider,messages,schema)
         else:payload=provider.generate(messages,schema,timeout=15,max_output_tokens=64)
         if payload!={'status':'ok'}:raise ValueError('Synthetic response contract rejected')
-        result.update(status='controlled-key-validation-accepted',model=MODEL,usage=provider.last_usage)
+        result.update(status='controlled-key-validation-accepted',model=MODEL,usage=provider.last_usage,quota=provider.last_quota)
     except Exception as error:
         result['diagnostic']=safe_diagnostic(error)
         if advisor_quota.is_quota(result['diagnostic']):advisor_quota.record(db,provider_name,time.time(),result['diagnostic'])
@@ -165,6 +165,9 @@ def run_host(data):
     if os.geteuid()==0:raise ValueError('Application uid required')
     raw=base64.b64decode(data['csv_base64'],validate=True)
     parse_export(raw)
+    now=time.time()
+    if int(now//86400)!=int(EXPORTED_AT//86400) or not 0<=now-EXPORTED_AT<=6*3600:
+        raise ValueError('Stale export cannot initialize current-day counters')
     evidence=data['historical_evidence']
     if evidence.get('accepted_case_count')!=9 or evidence.get('all_nine_fixture_results_preserved') is not True:
         raise ValueError('Historical quality evidence missing')
