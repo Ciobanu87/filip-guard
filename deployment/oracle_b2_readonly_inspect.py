@@ -6,9 +6,11 @@ import requests
 PHASE="preflight"
 CALLS=0
 HTTP_STATUS=None
+ERROR_CODE=None
+ERROR_HINT=None
 
 def main():
-    global PHASE,CALLS,HTTP_STATUS
+    global PHASE,CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT
     resource.setrlimit(resource.RLIMIT_CORE,(0,0))
     PHASE='custody-and-service-hold'
     helper=runpy.run_path('/usr/local/sbin/filip-guard-master-custody')
@@ -26,15 +28,21 @@ def main():
     session=requests.Session();session.trust_env=False
     def get(url,authorization,params=None):
         nonlocal calls
-        global CALLS,HTTP_STATUS
+        global CALLS,HTTP_STATUS,ERROR_CODE,ERROR_HINT
         calls+=1;CALLS=calls
         if calls>2:raise ValueError('Bounded read-only request count exceeded')
         with session.get(url,headers={'Authorization':authorization},params=params,timeout=(5,10),allow_redirects=False,stream=True) as response:
             HTTP_STATUS=response.status_code
-            if response.status_code!=200:raise ValueError('Read-only permission or free cap prevents metadata read')
             raw=response.raw.read(65537)
             if len(raw)>65536:raise ValueError('Bounded response required')
-            return json.loads(raw)
+            data=json.loads(raw)
+            if response.status_code!=200:
+                code=data.get('code','') if isinstance(data,dict) else ''
+                ERROR_CODE=code if re.fullmatch('[a-z_]{1,64}',code) else 'unclassified'
+                message=data.get('message','') if isinstance(data,dict) else ''
+                ERROR_HINT=('bucket-parameter-missing' if 'bucketId' in message and any(x in message.lower() for x in ('missing','required')) else 'api-request-rejected')
+                raise ValueError('Read-only request held')
+            return data
     try:
         PHASE='native-account-authorization'
         auth=get('https://api.backblazeb2.com/b2api/v4/b2_authorize_account','Basic '+base64.b64encode((key+':'+secret).encode()).decode())
@@ -59,7 +67,7 @@ def main():
         result=get(url+'/b2api/v4/b2_get_bucket_notification_rules',auth['authorizationToken'],{'bucketId':bucket_id})
         PHASE='notification-response-schema'
         entries=result if isinstance(result,list) else [result]
-        if len(entries)!=1 or entries[0].get('bucketId')!=bucket_id:raise ValueError('Unexpected notification response')
+        if len(entries)!=1 or not isinstance(entries[0],dict) or entries[0].get('bucketId',bucket_id)!=bucket_id:raise ValueError('Unexpected notification response')
         rules=entries[0]['eventNotificationRules']
         if not isinstance(rules,list) or any(type(r.get('isEnabled')) is not bool for r in rules):raise ValueError('Unverified rule states')
         report.update(b2_api_calls=calls,notifications_verified_disabled=not any(r['isEnabled'] for r in rules),notification_rule_count=len(rules))
@@ -70,4 +78,4 @@ def main():
 if __name__=='__main__':
     try:print(json.dumps(main(),sort_keys=True))
     except Exception:
-        print(json.dumps({'status':'b2-read-only-inspection-held','phase':PHASE,'b2_api_calls':CALLS,'last_http_status':HTTP_STATUS,'services_started':False,'secret_values_printed':False,'automatic_retries':0},sort_keys=True))
+        print(json.dumps({'status':'b2-read-only-inspection-held','phase':PHASE,'b2_api_calls':CALLS,'last_http_status':HTTP_STATUS,'error_code':ERROR_CODE,'error_hint':ERROR_HINT,'services_started':False,'secret_values_printed':False,'automatic_retries':0},sort_keys=True))
