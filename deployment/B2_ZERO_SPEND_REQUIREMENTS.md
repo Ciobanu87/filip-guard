@@ -40,3 +40,34 @@ https://www.backblaze.com/cloud-storage/pricing
 https://www.backblaze.com/cloud-storage/transaction-pricing
 https://www.backblaze.com/docs/cloud-storage-data-caps-and-alerts
 https://www.backblaze.com/docs/cloud-storage-create-and-manage-caps-and-alerts
+
+
+## Provider feature gate and one manual recovery validation
+
+A link to the public Event Notifications article is not evidence of an empty rule
+list. The bounded native inspection distinguishes a successful list with no
+enabled rules from the provider's exact `400 bad_request: API not enabled`
+response on the notification-read endpoint. The latter is recorded as an
+unavailable notification API, not as a fabricated empty list. It is consistent
+with the official reference requiring Support to enable the feature. No Support
+enablement, notification write or credential expansion is part of this task.
+Unauthorized, restricted-prefix, malformed-parameter and other errors never
+satisfy this check. A future enabled feature needs a fresh successful rule read.
+
+The separate manual workflow requires already owner-confirmed saved zero-dollar
+caps, verified independent master custody, held/disabled units, no runtime-user
+writers, a complete bounded all-version bucket inventory, no unfinished uploads,
+and at least eight maximum-size archive slots below the 10 GB free allowance.
+It reserves a new private attempt before any write, permits only one existing
+format encrypted state upload and two recovery reads, and never retries or
+overwrites a prior attempt. The original SQLite files must stay byte-identical.
+The downloaded ciphertext is restored into a new private directory with the
+existing restore-review hold. This neither initializes missing customer state
+nor enables the scheduled backup or any application service. Existing account
+activities outside this scoped key remain outside its inspection scope.
+
+The recovery manifest and completion record stay private under the existing
+server recovery directory; no private object identifiers or storage totals are
+published in repository source or Actions output. Independent key custody was
+verified separately on the owner's device. This manual check is SQLite state
+recovery, not a claim of a full WordPress or whole-VM restore.
