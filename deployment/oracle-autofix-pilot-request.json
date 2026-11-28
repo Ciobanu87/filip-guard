@@ -1,0 +1,12 @@
+{
+  "authorized_on": "2026-11-28",
+  "scope": "approved-private-autofix-pilot-existing-dependencies-only",
+  "candidate": "ee593326f89b5db8a1f0700c6a9f18424a36e0e6",
+  "initial_phase": "read-only-allocation-capacity-dependencies",
+  "global_installations": false,
+  "modify_existing_application": false,
+  "public_listeners": false,
+  "real_groq_smtp_b2_calls": false,
+  "production_activation": false,
+  "extra_cloud_resources": false
+}
