@@ -229,6 +229,9 @@ class ContextualAdvisor:
                     db.execute('UPDATE advisor_requests SET state=?,expires=?,result=? WHERE scope=? AND request_hash=? AND started=?',
                         ('readiness-failure' if key_failure else 'transient' if limited else 'complete' if result['status']=='model-assisted' else 'failed',
                          now+(3600 if result['status']=='model-assisted' else 600),json.dumps(result),scope,digest,now))
+        if result['status']=='model-assisted':
+            from operations_events import record
+            record('ai','verified')
         return render_language(result,language)
 
 

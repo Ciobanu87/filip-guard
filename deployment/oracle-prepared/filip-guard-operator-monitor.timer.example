@@ -1,0 +1,9 @@
+[Unit]
+Description=FILIP GUARD bounded administrator observation schedule
+[Timer]
+OnBootSec=60
+OnUnitInactiveSec=60
+AccuracySec=5
+Unit=filip-guard-operator-monitor.service
+[Install]
+WantedBy=timers.target

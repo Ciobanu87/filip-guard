@@ -26,4 +26,6 @@ class AdvisorFailure(ValueError,ProviderUnavailable):
         super().__init__('Advisor request rejected: '+self.diagnostic['code'])
 
 def safe_diagnostic(error):
+    from operations_events import record
+    record('ai','failed')
     return dict(error.diagnostic) if type(error) is AdvisorFailure else {'stage':'unknown','code':'unknown'}

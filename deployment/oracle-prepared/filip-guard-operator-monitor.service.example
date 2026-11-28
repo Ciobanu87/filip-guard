@@ -1,0 +1,26 @@
+[Unit]
+Description=FILIP GUARD private administrator observation only
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/filip-guard/healthchecks.json
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/filip-guard-operations
+ExecStart=/usr/bin/python3 /opt/filip-guard-operations/operations_healthchecks.py --once
+TimeoutStartSec=45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+ReadOnlyPaths=/srv/filip-guard/state
+InaccessiblePaths=/etc/filip-guard/secrets
+ReadWritePaths=/srv/filip-guard/operations /run/filip-guard-backup.lock
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=128M

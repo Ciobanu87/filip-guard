@@ -163,6 +163,9 @@ class AutoFixEngine:
         with self._db() as db:
             db.execute('UPDATE repair_plans SET state=?, result=? WHERE plan_id=?',
                        (status, _json(result), plan_id))
+        if status in ('outcome_unknown','rollback_unverified','rollback_conflict'):
+            from operations_events import record
+            record('rollback' if status.startswith('rollback') else 'autofix','failed',plan_id)
         return result
 
     def status(self, plan_id, *, user_id, session_id, now=None):
@@ -217,6 +220,8 @@ class AutoFixEngine:
                     or backup.get('content_hash') != sha256(original.content.encode()).hexdigest()):
                 raise RuntimeError('Persistent verified content backup required')
         except Exception:
+            from operations_events import record
+            record('backup','failed',plan_id)
             # No WordPress write was admitted. Preserve the existing explicit
             # caller retry contract; never retry here. Process death is different:
             # BaseException is deliberately not caught and keeps the durable hold.
