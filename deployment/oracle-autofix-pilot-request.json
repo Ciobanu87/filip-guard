@@ -9,6 +9,7 @@
   "real_groq_smtp_b2_calls": false,
   "production_activation": false,
   "extra_cloud_resources": false,
-  "inspection_revision": 2,
-  "reason": "Verify standard libexec/local prefixes and installed RPM paths before declaring dependencies absent"
+  "inspection_revision": 3,
+  "reason": "Verify standard libexec/local prefixes and installed RPM paths before declaring dependencies absent",
+  "approved_independent_phase": "Python-only synthetic subset using existing runtime and isolated network namespace; not real WordPress/PHP"
 }

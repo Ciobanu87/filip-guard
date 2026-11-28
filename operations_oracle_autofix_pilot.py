@@ -1,5 +1,6 @@
 """Authorized read-only dependency admission before the approved private pilot."""
 import json
+import os
 from pathlib import Path
 from operations_oracle_ssh_probe import run_pinned_command
 
@@ -46,7 +47,11 @@ def main():
         result=assess(report)
     except Exception:
         print(json.dumps({'status':'read-only-admission-unverified','pilot_executed':False,'server_modified':False}));return 1
-    print(json.dumps(result,sort_keys=True));return 0
+    print(json.dumps(result,sort_keys=True))
+    native=(result['allocation_within_current_free_limits'] and result['capacity_sufficient'] and report.get('all_guard_units_inactive') is True and report.get('existing_python_available') is True)
+    if os.environ.get('GITHUB_OUTPUT'):
+        with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('native_eligible='+str(native).lower()+'\n')
+    return 0
 
 
 if __name__=='__main__':raise SystemExit(main())
