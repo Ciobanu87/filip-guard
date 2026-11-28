@@ -39,6 +39,17 @@ class PrivatePilotGuards(unittest.TestCase):
             with self.subTest(status=status),patch.object(launcher.subprocess,'run',return_value=subprocess.CompletedProcess([],0,b'archive')),patch.object(launcher,'run_pinned_command',return_value=json.dumps({'status':status})),patch('builtins.print'):
                 self.assertEqual(launcher.main(),1)
 
+    def test_memory_bound_counts_descendants_even_in_separate_sessions(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            proc=Path(directory)
+            for pid,ppid,kib in ((100,1,10),(101,100,20),(102,101,30),(200,1,9000)):
+                entry=proc/str(pid);entry.mkdir()
+                (entry/'stat').write_text(str(pid)+' (name with spaces) S '+str(ppid)+' 999 999')
+                (entry/'status').write_text('VmRSS: '+str(kib)+' kB\n')
+            with patch.object(pilot,'Path',return_value=proc):
+                self.assertEqual(pilot.descendant_rss(100),60*1024)
+
     def test_ssh_failure_is_redacted(self):
         with patch.object(launcher.subprocess,'run',side_effect=RuntimeError('sensitive-output')),patch('builtins.print') as output:
             self.assertEqual(launcher.main(),1)

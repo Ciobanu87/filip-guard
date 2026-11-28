@@ -43,6 +43,25 @@ def rpm_state():
     return hashlib.sha256(b'\n'.join(sorted(result.stdout.splitlines()))).hexdigest()
 
 
+def descendant_rss(parent_pid):
+    """Sum resident memory for the private process tree, including new sessions."""
+    records={}
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdigit():continue
+        try:
+            fields=(entry/'stat').read_text().rsplit(')',1)[1].split()
+            memory=(entry/'status').read_text().splitlines()
+            rss=next((int(line.split()[1])*1024 for line in memory if line.startswith('VmRSS:')),0)
+            records[int(entry.name)]=(int(fields[1]),rss)
+        except (OSError,ValueError,IndexError):continue
+    selected={parent_pid}
+    while True:
+        expanded=selected|{pid for pid,(ppid,_) in records.items() if ppid in selected}
+        if expanded==selected:break
+        selected=expanded
+    return sum(records.get(pid,(0,0))[1] for pid in selected)
+
+
 def bounded(args, *, env, cwd, log, seconds=360):
     """Never expose command output; cap private disk, free space and wall time."""
     with open(log,'ab') as output:
@@ -50,12 +69,12 @@ def bounded(args, *, env, cwd, log, seconds=360):
         started=time.monotonic()
         try:
             while process.poll() is None:
-                if (DEADLINE is not None and time.monotonic()>DEADLINE) or time.monotonic()-started>seconds or H.directory_bytes(ROOT)>2*1024**3 or shutil.disk_usage(ROOT).free<5*1024**3:
+                if (DEADLINE is not None and time.monotonic()>DEADLINE) or time.monotonic()-started>seconds or H.directory_bytes(ROOT)>2*1024**3 or shutil.disk_usage(ROOT).free<5*1024**3 or descendant_rss(process.pid)>2*1024**3:
                     raise RuntimeError('Private pilot resource bound reached')
                 time.sleep(.5)
             if process.returncode:
                 diagnostic=Path(log).read_text(errors='replace')[-20000:]
-                for label,needle in (('no-package-match','No match for argument'),('repo-download-failed','Failed to download'),('gpg-check-failed','GPG check FAILED'),('gpg-key-unavailable','GPG key retrieval failed'),('module-unavailable','missing groups or modules'),('php-warning','PHP Warning'),('sql-init-failed','Installation of system tables failed'),('python-traceback','Traceback'),('test-errors','FAILED (errors='),('test-failures','FAILED (failures='),('permission-denied','Permission denied'),('sql-start-failed','SQL server failed to start'),('php-extension-load','Unable to load dynamic library'),('loader-error','error while loading shared libraries'),('undefined-symbol','undefined symbol'),('called-process-error','CalledProcessError'),('assertion-error','AssertionError'),('module-not-found','ModuleNotFoundError'),('name-error','NameError'),('missing-path','No such file or directory')):
+                for label,needle in (('no-package-match','No match for argument'),('repo-download-failed','Failed to download'),('gpg-check-failed','GPG check FAILED'),('gpg-key-unavailable','GPG key retrieval failed'),('module-unavailable','missing groups or modules'),('php-warning','PHP Warning'),('sql-init-failed','Installation of system tables failed'),('python-traceback','Traceback'),('test-errors','FAILED (errors='),('test-failures','FAILED (failures='),('permission-denied','Permission denied'),('sql-start-failed','SQL server failed to start'),('php-extension-load','Unable to load dynamic library'),('loader-error','error while loading shared libraries'),('undefined-symbol','undefined symbol'),('called-process-error','CalledProcessError'),('assertion-error','AssertionError'),('module-not-found','ModuleNotFoundError'),('name-error','NameError'),('missing-path','No such file or directory'),('fixture-command-failed','Local fixture command failed'),('db-connection-error','database connection'),('undefined-php-function','undefined function'),('sql-unknown-option','unknown variable')):
                     if needle in diagnostic and label not in DIAGNOSTICS:DIAGNOSTICS.append(label)
                 DIAGNOSTICS.extend('python-line-'+n for n in __import__('re').findall(r'File "<string>", line (\d+)',diagnostic) if 'python-line-'+n not in DIAGNOSTICS)
                 raise RuntimeError('Private command failed')
@@ -167,9 +186,28 @@ init=[INIT,'--no-defaults','--basedir='+BASE_DIR,'--datadir='+DATA_DIR,'--auth-r
 subprocess.run(init,check=True,timeout=90)
 progress('wordpress-fixture-and-tests')
 namespace=runpy.run_path(RUNNER,run_name='private_wordpress_pilot')
+extra=[]
+def classify(text):
+ for label,needle in [('sql-permission','Permission denied'),('sql-unknown-option','unknown variable'),('sql-missing-file','No such file'),('sql-innodb','InnoDB'),('sql-unsupported','unsupported'),('db-connect','Connection refused'),('php-missing-function','undefined function'),('php-missing-class','Class '),('fixture-db-error','database connection')]:
+  if needle in text and label not in extra:extra.append(label)
+ import re
+ for name in re.findall(r'undefined function ([a-zA-Z_][a-zA-Z_0-9]*)\(',text):
+  if len(name)<80:extra.append('undefined-function:'+name)
+fixture_cls=namespace['RealWordPress'];original_command=fixture_cls.command;original_start=fixture_cls.start_database
+def guarded_command(self,*args,**kwargs):
+ try:return original_command(self,*args,**kwargs)
+ except Exception as error:
+  classify(str(error));raise
+def guarded_start(self):
+ try:return original_start(self)
+ except Exception:
+  log=self.root/'database.log'
+  if log.is_file():classify(log.read_text(errors='replace')[-10000:])
+  raise
+fixture_cls.command=guarded_command;fixture_cls.start_database=guarded_start
 cls=namespace['RealWordPressTests'];suite=unittest.TestSuite(cls(name) for name in NAMES)
 r=unittest.TextTestRunner(verbosity=2).run(suite)
-with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0]),f)
+with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0],diagnostics=extra,failed_cases=[t._testMethodName for t,_ in r.failures+r.errors]),f)
 raise SystemExit(0 if r.wasSuccessful() else 1)
 '''
         replacements={'ENV':child_env,'HOST_NET':os.readlink('/proc/self/ns/net'),'PHP':str(php),'INI':str(ini),
@@ -181,7 +219,7 @@ raise SystemExit(0 if r.wasSuccessful() else 1)
         # The privileged namespace launcher uses only host binaries and a clean env.
         launch="import subprocess,os;subprocess.run("+repr([ip,'link','set','lo','up'])+",check=True);os.execv("+repr(runuser)+","+repr([runuser,'-u','nobody','--','/opt/filip-guard/.venv/bin/python','-c',harness])+")"
         PHASE='isolated-real-wordpress-tests'
-        try:bounded([unshare,'--net','--','/usr/bin/python3','-c',launch],env=env,cwd=source,log=logs/'tests.log',seconds=240)
+        try:bounded([unshare,'--net','--pid','--fork','--kill-child=SIGKILL','--','/usr/bin/python3','-c',launch],env=env,cwd=source,log=logs/'tests.log',seconds=240)
         except RuntimeError:
             if not result.is_file():
                 if stage.is_file():PHASE=json.loads(stage.read_text())['stage']
@@ -189,7 +227,7 @@ raise SystemExit(0 if r.wasSuccessful() else 1)
         measured=json.loads(result.read_text())
         PHASE='cleanup'
         report=dict(status='private-wordpress-pilot-passed' if measured['tests']==len(TESTS) and not any(measured[k] for k in ('errors','failures','skipped')) else 'private-wordpress-pilot-failed',
-          measured=measured,candidate='ee593326f89b5db8a1f0700c6a9f18424a36e0e6',
+          measured=measured,diagnostics=DIAGNOSTICS,candidate='ee593326f89b5db8a1f0700c6a9f18424a36e0e6',
           elapsed_seconds=round(time.monotonic()-started,2),private_disk_bytes=H.directory_bytes(ROOT),
           private_packages_gpg_checked=True,package_scriptlets_disabled=True,arm64=True,
           real_wordpress_version='7.1.5',sql_family='MariaDB 10.11',network_namespace_loopback_only=True,
