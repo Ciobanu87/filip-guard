@@ -207,7 +207,16 @@ def guarded_start(self):
 fixture_cls.command=guarded_command;fixture_cls.start_database=guarded_start
 cls=namespace['RealWordPressTests'];suite=unittest.TestSuite(cls(name) for name in NAMES)
 r=unittest.TextTestRunner(verbosity=2).run(suite)
-with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0],diagnostics=extra,failed_cases=[t._testMethodName for t,_ in r.failures+r.errors]),f)
+def safe_error(trace):
+ import re
+ frames=[(os.path.basename(path),int(line)) for path,line in re.findall(r'File "([^"\n]+)", line ([0-9]+)',trace)]
+ last=trace.strip().splitlines()[-1]
+ last=re.sub(r"'[^']*'",'[quoted]',last)
+ last=re.sub(r'"[^"]*"','[quoted]',last)
+ last=re.sub(r'[^ \t\n]{12,}','[redacted]',last)
+ return {'frames':frames[-4:],'summary':last[:300]}
+errors=[safe_error(trace) for _,trace in r.errors+r.failures]
+with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0],diagnostics=extra,error_summaries=errors,failed_cases=[getattr(t,'_testMethodName','setUpClass') for t,_ in r.failures+r.errors]),f)
 raise SystemExit(0 if r.wasSuccessful() else 1)
 '''
         replacements={'ENV':child_env,'HOST_NET':os.readlink('/proc/self/ns/net'),'PHP':str(php),'INI':str(ini),
