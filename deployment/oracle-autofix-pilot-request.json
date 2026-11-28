@@ -9,7 +9,7 @@
   "real_groq_smtp_b2_calls": false,
   "production_activation": false,
   "extra_cloud_resources": false,
-  "inspection_revision": 5,
-  "reason": "Private signed dependency preparation succeeded; diagnose isolated child startup without logging secrets",
+  "inspection_revision": 6,
+  "reason": "Use namespace-aware interface enumeration and route check; shared sysfs mount still shows host interfaces",
   "approved_independent_phase": "Actual disposable WordPress 7.1.5 with private PHP 8.3 and MariaDB 10.11; loopback-only network namespace"
 }

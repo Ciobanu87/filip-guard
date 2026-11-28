@@ -154,7 +154,9 @@ resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 resource.setrlimit(resource.RLIMIT_AS,(1536*1024**2,1536*1024**2))
 resource.setrlimit(resource.RLIMIT_FSIZE,(256*1024**2,256*1024**2))
 assert os.readlink('/proc/self/ns/net')!=HOST_NET
-assert os.listdir('/sys/class/net')==['lo']
+import socket
+assert [name for _,name in socket.if_nameindex()]==['lo']
+assert len(open('/proc/net/route').read().splitlines())==1
 assert os.geteuid() not in (0,pwd.getpwnam('filipguard').pw_uid)
 assert not os.access('/srv/filip-guard/state',os.R_OK|os.W_OK)
 progress('php-runtime-probe')
