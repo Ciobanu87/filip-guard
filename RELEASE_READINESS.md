@@ -1,4 +1,4 @@
-# FILIP GUARD development and release readiness — 2026-11-27
+# FILIP GUARD development and release readiness — 2026-11-28
 
 This is an evidence/scope matrix, not a declaration that the product is finished.
 Development is confined to `filip-guard-development`; `main` is unchanged. No new
@@ -56,6 +56,25 @@ profile and bound, short-lived environment evidence. The Python engine/gateway
 and PHP companion reject unsupported editors/builders before mutation. This is
 a restriction, not a plugin-compatibility guarantee. The readiness report now
 explicitly requires compatibility evidence and still cannot authorize writes.
+
+## Internal hardening audit — 2026-11-28
+
+See `AUTOFIX_INTERNAL_AUDIT_2026_11_28.md` for the concrete findings, fixes and
+new regression scenarios. Backup admission is now claimed before external I/O;
+crashes during preparation/consumption stay held. Write and rollback receipts
+require validated resource identities. The recovery review observes current
+content without rewriting an outcome or granting retries. AutoFix suggestions
+require unambiguous 404/410 observations and bounded evidence age; temporary or
+authorization errors remain read-only findings.
+
+The new full-state fixture recovery includes pending encrypted account delivery
+and a held repair journal, with automatic resume still blocked. This also exposed
+and corrected intermediate tenant-directory permissions; existing nonprivate or
+symlinked directories require operator review, never silent chmod/following.
+Password-change transactions recheck session revocation. Safety screening now
+checks Unicode-normalized draft text without changing retained source evidence.
+None of these tests validates actual Oracle state, real SMTP delivery, a customer
+WordPress environment or new provider semantics.
 
 ## Readiness conclusion
 

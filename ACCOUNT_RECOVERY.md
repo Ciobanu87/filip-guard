@@ -66,3 +66,10 @@ and consenting owner mailbox, followed by bounded actual verification/reset and
 session-revocation checks. No real mail was sent by the tests. Without a previously
 verified accessible mailbox, account recovery requires independent owner review;
 knowledge of the username or WordPress password is not a recovery substitute.
+
+
+The 2026-11-28 fixture now proves encrypted full-state recovery retains a pending
+account code together with a held AutoFix journal. The restore marker remains
+intact; this is not a live Oracle/B2 drill or authorization to replay recovered
+mail. Password changes also recheck session revocation inside the credential
+transaction, so logout between initial validation and transaction blocks change.

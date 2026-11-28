@@ -30,7 +30,8 @@ class CustomerSites:
         self.key_id,self.object_store,self.gateway_factory=active_key_id,object_store,gateway_factory
         if not re.fullmatch('[A-Za-z0-9_-]{1,64}',active_key_id):raise ValueError('Invalid key identifier')
         self.root.mkdir(parents=True,exist_ok=True,mode=0o700)
-        if self.root.stat().st_mode & 0o077:raise ValueError('Private customer data root required')
+        if self.root.is_symlink() or not self.root.is_dir() or self.root.stat().st_mode & 0o077:
+            raise ValueError('Private customer data root required')
         self.registry=private_database(self.root/'sites.sqlite')
         with self.db() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS customer_sites (
@@ -136,8 +137,15 @@ class CustomerSites:
 
     def _workspace(self,principal,site_id):
         # Both components are server-issued opaque hex IDs, never URLs or request paths.
-        path=self.root/'customers'/principal.customer_id/'sites'/site_id
-        path.mkdir(parents=True,exist_ok=True,mode=0o700)
+        path=self.root
+        for component in ('customers',principal.customer_id,'sites',site_id):
+            path=path/component
+            # parents=True applies mode only to the final directory. Every
+            # intermediate tenant directory must also be private for recovery.
+            if path.is_symlink():raise ValueError('Private customer workspace required')
+            path.mkdir(exist_ok=True,mode=0o700)
+            if not path.is_dir() or path.stat().st_mode & 0o077:
+                raise ValueError('Existing workspace permissions require operator review')
         return path
 
     def _context(self,session,site_id,*,now=None,require_external=False):

@@ -116,8 +116,11 @@ def render_guard_application(st_module=None,*,application=None):
                         review=application.prepare_restore(session,site_id,item['plan_id'])
                         ui.session_state[prefix+'_plan']=review['plan_id'];ui.rerun()
                 elif status=='rolled_back':ui.warning('Post-change verification failed; the original content was restored and verified.')
-                elif status in ('outcome_unknown','applying','rollback_unverified','rollback_conflict'):
-                    ui.warning('The outcome needs reconciliation. Automatic retry is blocked; the backup and journal are preserved.')
+                elif status in ('outcome_unknown','preparing_backup','applying','rollback_unverified','rollback_conflict'):
+                    ui.warning('The outcome needs reconciliation. Automatic retry is blocked; saved backup references and the journal are retained. Backup availability still requires verification.')
+                    if ui.button('Inspect recovery state (read only)',key='fg_customer_guard_inspect_'+item['plan_id']):
+                        ui.json(application.recovery_review(session,site_id,item['plan_id']))
+                        ui.caption('Matching content does not prove the operation outcome. This review authorizes no retry or rollback.')
                 elif state in ('proposed','approved') or status=='conflict':
                     if ui.button('Prepare fresh review',key='fg_customer_guard_renew_'+item['plan_id']):
                         review=application.renew_review(session,site_id,item['plan_id'])

@@ -17,7 +17,7 @@ from urllib.parse import urljoin,urlsplit,urldefrag
 
 from customer_auth import private_database,instant
 from wordpress_execution_gate import _origin
-from wordpress_revision_guard import ResourceSnapshot,verify_unchanged
+from wordpress_revision_guard import ResourceSnapshot,verify_unchanged,RevisionMismatchError
 from wordpress_secure_https import _https_request_exchange,parse_http_response
 from monitoring_scan import SecureMonitoringScan,target_url
 from link_resolver import suggest_replacements
@@ -37,12 +37,23 @@ def replace_broken_href(content,source_url,broken_url,replacement_url):
     target_url(broken_url,host);target_url(replacement_url,host)
     broken=canonical(broken_url)
     if broken==canonical(replacement_url):raise UnsupportedRepair('Replacement must differ')
+    if re.search(r'<\s*(?:base|plaintext)\b',content,re.I):
+        raise UnsupportedRepair('Unsupported document URL or raw-text context')
     offsets=[0]
     for match in re.finditer('\n',content):offsets.append(match.end())
     edits=[]
     class Anchors(HTMLParser):
+        def __init__(self,**kwargs):
+            super().__init__(**kwargs);self.blocked=[]
+        inert={'textarea','title','xmp','iframe','noembed','noframes','template','noscript'}
+        def handle_endtag(self,tag):
+            if tag in self.blocked:
+                index=len(self.blocked)-1-self.blocked[::-1].index(tag)
+                del self.blocked[index:]
         def handle_starttag(self,tag,attrs):
-            if tag!='a':return
+            if tag in self.inert:
+                self.blocked.append(tag);return
+            if self.blocked or tag!='a':return
             hrefs=[v for k,v in attrs if k=='href']
             if len(hrefs)!=1 or hrefs[0] is None:return
             try:matches=canonical(urljoin(source_url,hrefs[0]))==broken
@@ -66,7 +77,9 @@ def replace_broken_href(content,source_url,broken_url,replacement_url):
 def verify_public_replacement(url,origin):
     host,path,_=target_url(url,urlsplit(origin).hostname)
     response=parse_http_response(_https_request_exchange(host,path,8,accept='text/html,application/xhtml+xml'))
-    if not 200<=response.status<300:raise UnsupportedRepair('Replacement URL is not verified reachable')
+    types=[value.split(';')[0].strip().lower() for key,value in response.headers if key.lower()=='content-type']
+    if response.status!=200 or types not in (['text/html'],['application/xhtml+xml']) or not response.body.strip():
+        raise UnsupportedRepair('Replacement must be a complete verified HTML page')
     return True
 
 
@@ -172,18 +185,24 @@ class GuardApplication:
 
     def proposals(self,session,site_id,scan_id):
         scan=self.scan_record(session,site_id,scan_id);result=[]
+        from wordpress_repair_diagnosis import diagnose_link
         for issue in scan['report']['findings']:
             if issue['scope_kind']!='link':continue
+            diagnosis=diagnose_link(scan['report'],issue['scope_key'])
+            if not diagnosis['link_replacement_eligible']:continue
             sources={canonical(source) for source in issue.get('sources',[])}
             for item in scan['inventory']:
                 if canonical(item['link']) in sources:
                     candidates=suggest_replacements(issue['scope_key'],scan['inventory'])
                     result.append(dict(issue_key=issue['key'],broken_url=issue['scope_key'],source_url=item['link'],
-                        resource_id=item['resource_id'],resource_type=item['resource_type'],candidates=candidates))
+                        resource_id=item['resource_id'],resource_type=item['resource_type'],candidates=candidates,diagnosis=diagnosis))
         return result
 
     def prepare_repair(self,session,site_id,scan_id,issue_key,resource_id,replacement_url):
         _,site=self._owned(session,site_id)
+        scan=self.scan_record(session,site_id,scan_id)
+        if not 0<=instant()-scan['created_at']<900:
+            raise UnsupportedRepair('Scan evidence expired; prepare a new scan')
         proposal=next((p for p in self.proposals(session,site_id,scan_id)
                        if p['issue_key']==issue_key and p['resource_id']==resource_id),None)
         if proposal is None:raise UnsupportedRepair('No supported proposal for this scan/resource')
@@ -211,8 +230,15 @@ class GuardApplication:
         return dict(row)
 
     def approve_and_apply(self,session,site_id,plan_id,*,confirmed=False):
-        self._flow(session,site_id,plan_id)
+        flow=self._flow(session,site_id,plan_id)
         if confirmed is not True:raise PermissionError('Explicit approval required')
+        if flow['kind']=='repair':
+            scan=self.scan_record(session,site_id,flow['scan_id'])
+            if not 0<=instant()-scan['created_at']<900:
+                raise UnsupportedRepair('Scan evidence expired; prepare a new scan')
+            _,site=self._owned(session,site_id)
+            if self.probe(flow['replacement_url'],site['origin']) is not True:
+                raise UnsupportedRepair('Replacement is no longer verified reachable')
         token=self.sites.approve(session,site_id,plan_id,confirmed=True)
         return self.sites.apply(session,site_id,plan_id,token)
 
@@ -237,6 +263,31 @@ class GuardApplication:
         with self.db(session,site_id) as db:
             rows=db.execute('SELECT * FROM application_repairs ORDER BY created_at DESC LIMIT 30').fetchall()
         return [{**dict(row),'repair':self.sites.repair_record(session,site_id,row['plan_id'])} for row in rows]
+
+    def recovery_review(self,session,site_id,plan_id):
+        """Read-only evidence after interruption; never clear a hold or grant retry.
+
+        Matching proposed/original content does not prove operation ownership or
+        verified restoration. A later editor can independently write those bytes.
+        """
+        flow=self._flow(session,site_id,plan_id)
+        record=self.sites.repair_record(session,site_id,plan_id)
+        result=record['result'] or {}
+        if record['state'] not in ('preparing_backup','applying','outcome_unknown','rollback_unverified','rollback_conflict'):
+            raise PermissionError('Only held operations require this recovery review')
+        original=ResourceSnapshot(**record['payload']['original'])
+        current=self.sites.read_resource(session,site_id,flow['resource_type'],flow['resource_id'])
+        verify_unchanged(current,current)
+        if (current.site_url,current.resource_type,current.resource_id)!=(original.site_url,original.resource_type,original.resource_id):
+            raise PermissionError('Recovery resource identity mismatch')
+        try:verify_unchanged(original,current);same_version=True
+        except RevisionMismatchError:same_version=False
+        observed='original' if current.content==original.content else 'proposed' if current.content==record['payload']['proposed_content'] else 'different'
+        self._owned(session,site_id)
+        return dict(plan_id=plan_id,recorded_status=record['state'],observed_content=observed,
+            original_version_matches=same_version,backup_id=result.get('backup_id'),
+            backup_revalidation_required=True,operation_outcome_proven=False,
+            mutations_authorized=False,automatic_retry_allowed=False,requires_intervention=True)
 
     def renew_review(self,session,site_id,plan_id):
         flow=self._flow(session,site_id,plan_id)

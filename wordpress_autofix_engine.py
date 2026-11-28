@@ -166,7 +166,7 @@ class AutoFixEngine:
         row, _ = self._load(plan_id, user_id, session_id, now)
         return json.loads(row['result']) if row['result'] else {
             'plan_id': plan_id, 'status': row['state'], 'changes_applied': None,
-            'requires_intervention': row['state'] == 'applying'}
+            'requires_intervention': row['state'] in ('preparing_backup','applying')}
 
     def apply(self, plan_id, approval_token, *, user_id, session_id, now=None):
         """Apply once; ambiguous failures never trigger a blind retry or rollback."""
@@ -190,20 +190,43 @@ class AutoFixEngine:
                         user_id=user_id, current_content=observed.content,
                         proposed_content=payload['proposed_content'], now=instant)
         self.approvals.verify_session_binding(approval, session_id)
-        backup_id = self.backups.create_backup(original.site_url, original.resource_id, original.content)
-        backup = self.backups.get_backup(backup_id)
-        if (not backup or backup.get('site_url') != original.site_url
-                or backup.get('resource_id') != original.resource_id
-                or backup.get('content') != original.content
-                or backup.get('content_hash') != sha256(original.content.encode()).hexdigest()):
-            raise RuntimeError('Persistent verified content backup required')
-        # External backup readback may outlast the approval; re-check wall time now.
+        # Reserve before any external backup I/O, not only before the write.
+        # A crashed preparation stays held across restarts; no duplicate upload.
+        with self._db() as db:
+            cursor = db.execute("UPDATE repair_plans SET state='preparing_backup', result=? WHERE plan_id=? AND state='approved'",
+                (_json(dict(plan_id=plan_id, status='preparing_backup', backup_id=None,
+                            changes_applied=False, requires_intervention=True)), plan_id))
+            if cursor.rowcount != 1:
+                raise PermissionError('Repair already claimed')
+        backup_id = None
+        try:
+            backup_id = self.backups.create_backup(original.site_url, original.resource_id, original.content)
+            with self._db() as db:
+                db.execute("UPDATE repair_plans SET result=? WHERE plan_id=? AND state='preparing_backup'",
+                    (_json(dict(plan_id=plan_id, status='preparing_backup', backup_id=backup_id,
+                                changes_applied=False, requires_intervention=True)), plan_id))
+            backup = self.backups.get_backup(backup_id)
+            if (not backup or backup.get('site_url') != original.site_url
+                    or backup.get('resource_id') != original.resource_id
+                    or backup.get('content') != original.content
+                    or backup.get('content_hash') != sha256(original.content.encode()).hexdigest()):
+                raise RuntimeError('Persistent verified content backup required')
+        except Exception:
+            # No WordPress write was admitted. Preserve the existing explicit
+            # caller retry contract; never retry here. Process death is different:
+            # BaseException is deliberately not caught and keeps the durable hold.
+            with self._db() as db:
+                db.execute("UPDATE repair_plans SET state='approved', result=NULL WHERE plan_id=? AND state='preparing_backup'",(plan_id,))
+            raise
+        # External backup readback may outlast the approval; re-check wall time.
+        # Failure after this boundary stays held, including a process death after
+        # consumption and before the applying journal update.
         self.approvals.consume_for_offline_review(approval, site_url=original.site_url,
             resource_id=original.resource_id, user_id=user_id, current_content=original.content,
             proposed_content=payload['proposed_content'], now=_instant(now), session_id=session_id)
         with self._db() as db:
-            cursor = db.execute("UPDATE repair_plans SET state='applying', result=? WHERE plan_id=? AND state='approved'",
-                                (_json(dict(status='applying', backup_id=backup_id,
+            cursor = db.execute("UPDATE repair_plans SET state='applying', result=? WHERE plan_id=? AND state='preparing_backup'",
+                                (_json(dict(plan_id=plan_id, status='applying', backup_id=backup_id,
                                             changes_applied=None, requires_intervention=True)), plan_id))
             if cursor.rowcount != 1:
                 raise PermissionError('Repair already claimed')
@@ -215,6 +238,11 @@ class AutoFixEngine:
         except Exception:
             return self._finish(plan_id, 'outcome_unknown', backup_id, changes_applied=None,
                                 detail='Write outcome unknown. Reconcile server state before any retry.')
+        try:
+            verify_unchanged(written, written)
+        except (RevisionMismatchError, ValueError, UnicodeError):
+            return self._finish(plan_id, 'outcome_unknown', backup_id, changes_applied=None,
+                                detail='Invalid write receipt; automatic rollback is unsafe.')
         if (type(written) is not ResourceSnapshot
                 or (written.site_url, written.resource_type, written.resource_id, written.content) !=
                 (original.site_url, original.resource_type, original.resource_id, payload['proposed_content'])
@@ -230,7 +258,9 @@ class AutoFixEngine:
             try:
                 restored = self.gateway.compare_and_swap(written, backup['content'], user_id,
                                                          operation_id=plan_id + ':rollback')
-                if (type(restored) is not ResourceSnapshot or restored.content != original.content
+                if (type(restored) is not ResourceSnapshot
+                        or (restored.site_url, restored.resource_type, restored.resource_id, restored.content) !=
+                        (original.site_url, original.resource_type, original.resource_id, original.content)
                         or restored.revision == written.revision):
                     raise RuntimeError('Invalid rollback receipt')
                 verify_unchanged(restored, self.gateway.read_authorized(

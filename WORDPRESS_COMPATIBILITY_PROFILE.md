@@ -67,3 +67,19 @@ that restriction, turn a readiness boolean into authority or enable the companio
 in production merely because offline tests pass. Product-wide production AutoFix
 readiness therefore remains incomplete; the conservative profile and its tests
 are complete development evidence for this bounded candidate only.
+
+
+## Repair admission and interrupted operations
+
+Only unambiguous observed 404/410 destinations are offered for link replacement.
+401/403, 429, 5xx, mixed failures and missing evidence do not establish a content
+repair; they remain monitoring findings. Even 404/410 does not establish why the
+server returned that status. Scan evidence expires after fifteen minutes and is
+checked at proposal and approval. Replacement availability is checked again at
+approval; only a complete nonempty HTTP 200 HTML response passes the default probe.
+Reachability is not proof of relevance; exact human review remains mandatory.
+
+Href replacement ignores anchors inside inert/raw-text contexts and rejects
+document base/plaintext contexts that would invalidate URL interpretation. A
+read-only recovery review never reclassifies matching content as verified apply
+or rollback. Details and crash boundaries are recorded in the internal audit.

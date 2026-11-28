@@ -58,7 +58,10 @@ network call and refuses partial existing component sets. Preserve the separate
 reconciled AI ledger byte-for-byte; never create a replacement AI budget.
 
 Run the existing read-only state/schema/AI-history checks and verify permissions,
-restore-review markers and distinct DB paths. Prepare account policy/registration
+restore-review markers and distinct DB paths. Review every intermediate tenant
+directory as well: new code creates each at 0700 and refuses existing nonprivate
+or symlinked workspace directories. Do not silently chmod, follow links or reset
+state to get past this check. Prepare account policy/registration
 and owner test identity explicitly. Optional verification/recovery is implemented
 but remains off (`FG_ACCOUNT_RECOVERY_AUTHORIZED=0`); do not claim that offline
 tests verified a real mailbox or completed customer onboarding. Follow
@@ -147,3 +150,18 @@ WordPress content, rotate/delete retained keys or reset a budget to get green.
 Commercial billing, legal/privacy/retention and production customer AutoFix remain
 separate incomplete release work. This plan does not authorize them or claim that
 approval alone resolves missing functionality.
+
+
+## Interrupted AutoFix: held, read-only reconciliation
+
+`preparing_backup` is a durable claim before external backup I/O. A process death
+must not trigger another upload or write. `applying` and unknown/rollback outcomes
+likewise remain held; matching current content is not proof of operation ownership.
+The owner-only recovery review can read the current authorized resource and return
+content/version comparisons, retained backup ID and unchanged hold. It cannot
+clear the journal, authorize a retry, auto-restore or claim external backup
+availability. For a held preparation with no returned backup ID, inspect the
+existing private backup receipts/object history; never infer that no archive exists.
+Ordinary caught backup failures remain prewrite and permit the existing explicit
+caller retry; no automatic retry is introduced. Actual backup/recovery writes,
+service starts and any WordPress intervention still need separate approval.

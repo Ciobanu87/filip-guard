@@ -85,7 +85,7 @@ class SMTPNotificationSender:
         message['Subject']='FILIP GUARD — '+purpose
         message['From']=self.config.sender;message['To']=destination
         message['Message-ID']='<'+challenge['challenge_id']+'@'+self.config.sender.split('@')[1]+'>'
-        message.set_content(purpose+' code (expires in 15 minutes):\n\n'+challenge['token']+
+        message.set_content(purpose+' code (valid for 15 minutes from your request):\n\n'+challenge['token']+
             '\n\nEnter this code only in your FILIP GUARD account form. No password, login session or repair is granted by this email. If you did not request it, ignore it.')
         return self._deliver(message,destination)
 

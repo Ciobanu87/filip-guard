@@ -166,12 +166,19 @@ class CustomerAuth:
             db.execute('UPDATE customer_sessions SET revoked=1 WHERE token_digest=?', (digest,))
 
     def change_password(self, token, current_password, new_password, *, now=None):
-        principal = self.resolve(token, now=now)
+        timestamp = instant(now)
+        principal = self.resolve(token, now=timestamp)
         current = self._password(current_password)
         new = self._password(new_password, registering=True)
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            session = db.execute('SELECT * FROM customer_sessions WHERE token_digest=? AND customer_id=?',
+                                 (self.token_digest(token), principal.customer_id)).fetchone()
             row = db.execute('SELECT * FROM customers WHERE customer_id=?', (principal.customer_id,)).fetchone()
+            if (row is None or row['active'] != 1 or session is None or session['revoked']
+                    or not session['created_at'] <= timestamp < session['expires_at']
+                    or not 0 <= timestamp - session['last_seen'] < self.idle_ttl):
+                raise AuthenticationError('Session invalid or expired')
             if not compare_digest(scrypt(current, salt=bytes(row['salt']), n=16384, r=8, p=1, dklen=64),
                                   bytes(row['password_hash'])):
                 raise AuthenticationError('Invalid account credentials')

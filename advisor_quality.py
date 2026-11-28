@@ -25,9 +25,14 @@ def safe_seo_excerpt(text):
     Evidence may remain visible as untrusted data even when no draft is offered.
     """
     import re
+    import unicodedata
     if not isinstance(text,str):return False
-    dangerous=(r'\b(?:disable|bypass|turn off)\b.{0,45}\b(?:tls|ssl|certificates?|authentication|firewalls?|backups?|security)\b',
+    # Compare normalized text only; never rewrite the retained source evidence.
+    text=unicodedata.normalize('NFKC',text)
+    text=''.join(c for c in text if unicodedata.category(c)!='Cf')
+    text=' '.join(text.split())
+    dangerous=(r'\b(?:disable|bypass|turn off)\b.{0,160}\b(?:tls|ssl|certificates?|authentication|firewalls?|backups?|security)\b',
                r'\b(?:sudo\s+|rm\s+-[a-z]*[rf]|chmod\s+(?:-R\s+)?777|drop\s+table|truncate\s+table)\b',
-               r'\b(?:guaranteed|guarantee)\b.{0,45}\b(?:ranking|rankings|first.page|seo|cure|returns)\b',
-               r'\b(?:dezactiveaz[aă]|ocol[eie]ște)\b.{0,45}\b(?:tls|ssl|certificat|autentific|firewall|backup|securitat)')
+               r'\b(?:guaranteed|guarantee)\b.{0,160}\b(?:ranking|rankings|first.page|seo|cure|returns)\b',
+               r'\b(?:dezactiveaz[aă]|ocol[eie]ște)\b.{0,160}\b(?:tls|ssl|certificat|autentific|firewall|backup|securitat)')
     return not any(re.search(pattern,text,re.IGNORECASE) for pattern in dangerous)
