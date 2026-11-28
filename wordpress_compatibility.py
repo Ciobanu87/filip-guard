@@ -37,7 +37,7 @@ def assess_compatibility(snapshot,evidence=None,*,reviewed_theme_sha256=None,now
         if type(plugins) is not list or any(p!='filip-guard-companion/filip-guard-companion.php' for p in plugins):blockers.append('plugin-profile-review')
         if evidence.get('mu_plugins')!=[] or evidence.get('dropins')!=[]:blockers.append('mu-or-dropin-profile-review')
         metadata=evidence.get('metadata_keys')
-        if type(metadata) is not list or any(k not in ('_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id') for k in metadata):blockers.append('resource-metadata-review')
+        if type(metadata) is not list or any(k not in ('_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id','_wp_old_date','_wp_desired_post_slug','_pingme','_encloseme','_trackbackme') for k in metadata):blockers.append('resource-metadata-review')
         theme=evidence.get('theme_sha256')
         if type(reviewed_theme_sha256) is not str or not re.fullmatch('[0-9a-f]{64}',reviewed_theme_sha256) or theme!=reviewed_theme_sha256:blockers.append('theme-profile-review')
     return {'profile':PROFILE,'eligible_for_isolated_validation':not blockers,'blockers':blockers,

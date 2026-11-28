@@ -151,7 +151,7 @@ final class Filip_Guard_Companion {
             }
             $metadata=get_post_custom_keys($target[1]);
             if ($metadata===null) { $metadata=array(); }
-            if (!$admitted || !is_array($metadata) || array_diff($metadata,array('_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id'))) {
+            if (!$admitted || !is_array($metadata) || array_diff($metadata,array('_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id','_wp_old_date','_wp_desired_post_slug','_pingme','_encloseme','_trackbackme'))) {
                 return self::error('fg_profile',403);
             }
         }

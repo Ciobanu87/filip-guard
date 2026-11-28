@@ -594,6 +594,8 @@ class RealWordPressTests(unittest.TestCase):
             owner=self.fixture.gateway(owner=True)
             _,inventory=owner._request(f'/wp-json/filip-guard/v1/resources/post/{self.post_id}/compatibility')
             evidence=inventory['evidence']
+            known_core={'_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id','_wp_old_date','_wp_desired_post_slug','_pingme','_encloseme','_trackbackme'}
+            self.assertFalse(set(evidence['metadata_keys'])-known_core,'Unexpected fixture metadata keys: '+repr(evidence['metadata_keys']))
             root=Path(self.temp.name);path,receipt_path,doc,receipt,write,commit=artifacts(root,self.fixture.site_url)
             for key in ('wp_version','theme_sha256','companion_sha256'):doc[key]=receipt[key]=evidence[key]
             doc['resources']=[dict(kind='post',id=self.post_id)]

@@ -97,6 +97,7 @@ class ProductionPolicyTests(unittest.TestCase):
             observed_at=time.time(),environment='production',wp_version='7.1.5',multisite=False,active_plugins=['filip-guard-companion/filip-guard-companion.php'],
             mu_plugins=[],dropins=[],metadata_keys=[],theme_sha256='b'*64,companion_sha256=self.doc['companion_sha256'],production_policy_sha256=policy.digest)
         policy.check_evidence(snapshot,evidence)
+        policy.check_evidence(snapshot,{**evidence,'metadata_keys':['_pingme','_encloseme','_trackbackme','_wp_old_date','_wp_desired_post_slug']})
         for change in ({'wp_version':'6.9'},{'production_policy_sha256':'e'*64},{'active_plugins':['unknown/plugin.php']},{'observed_at':0}):
             with self.assertRaises(PermissionError):policy.check_evidence(snapshot,{**evidence,**change})
 

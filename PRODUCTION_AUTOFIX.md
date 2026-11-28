@@ -61,11 +61,16 @@ the user's environment yet; CI creates explicitly synthetic fixture records only
 ## Supported runtime profile, checked again before conditional writes
 
 Single-site WordPress 7.1.5, exact reviewed theme/companion, only FILIP GUARD companion active,
-no MU plugins or drop-ins, only reviewed core metadata keys, authenticated site
+no MU plugins or drop-ins, only reviewed core metadata keys (including native
+`_pingme`, `_encloseme`, `_trackbackme` and old-date/desired-slug bookkeeping), authenticated site
 administrator, HTTPS and Application Password. Inventory binds exact resource,
 revision/content hash, time (at most five minutes) and matching policy digest.
 The gateway re-reads admission before each authenticated request; the companion
 checks its own profile too. Version/theme/plugin/metadata/policy drift fails closed.
+These core keys are defined in the checksum-verified 7.1.5 source; arbitrary
+plugin/builder metadata is still rejected. Native hooks/jobs can update metadata
+or perform normal WordPress ping work: validate those effects on the approved
+copy; a content-only backup is not a full-site rollback.
 These are request-time drift checks, not a filesystem-wide atomic lock against
 an administrator changing configuration mid-request. Freeze deployments/updates
 for the reviewed admission window; post-row CAS remains the atomic write fence.
