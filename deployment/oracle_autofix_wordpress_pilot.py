@@ -38,6 +38,20 @@ TESTS=(
  'test_real_restore_lost_reply_is_explicitly_unverified')
 
 
+def render_program(program,values):
+    """Replace Python identifiers, never words inside literal diagnostic strings."""
+    import ast
+    class Substitute(ast.NodeTransformer):
+        def visit_Name(self,node):
+            if isinstance(node.ctx,ast.Load) and node.id in values:
+                return ast.copy_location(ast.parse(repr(values[node.id]),mode='eval').body,node)
+            return node
+    tree=ast.fix_missing_locations(Substitute().visit(ast.parse(program)))
+    rendered=ast.unparse(tree)
+    compile(rendered,'<isolated-pilot>','exec')
+    return rendered
+
+
 def rpm_state():
     result=subprocess.run(['rpm','-qa','--qf','%{NAME} %{VERSION}-%{RELEASE} %{ARCH}\\n'],capture_output=True,check=True,timeout=20)
     return hashlib.sha256(b'\n'.join(sorted(result.stdout.splitlines()))).hexdigest()
@@ -237,9 +251,7 @@ raise SystemExit(0 if r.wasSuccessful() else 1)
         replacements={'ENV':child_env,'HOST_NET':os.readlink('/proc/self/ns/net'),'PHP':str(php),'INI':str(ini),
           'INIT':str(runtime/'usr/bin/mariadb-install-db'),'BASE_DIR':str(runtime/'usr'),'DATA_DIR':str(work/'sql-data'),
           'PLUGINS':str(plugins),'MESSAGES':str(messages),'RUNNER':str(source/'tests/real_wordpress/run.py'),'NAMES':TESTS,'RESULT':str(result),'STAGE':str(stage)}
-        # Identifier substitution avoids modifying user data or string contents.
-        import re
-        harness=re.sub(r'\b('+ '|'.join(replacements)+r')\b',lambda m:repr(replacements[m[0]]),harness)
+        harness=render_program(harness,replacements)
         # The privileged namespace launcher uses only host binaries and a clean env.
         launch="import subprocess,os;subprocess.run("+repr([ip,'link','set','lo','up'])+",check=True);os.execv("+repr(runuser)+","+repr([runuser,'-u','nobody','--','/opt/filip-guard/.venv/bin/python','-c',harness])+")"
         PHASE='isolated-real-wordpress-tests'

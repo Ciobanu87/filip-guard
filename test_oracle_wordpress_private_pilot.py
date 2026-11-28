@@ -57,6 +57,14 @@ class PrivatePilotGuards(unittest.TestCase):
         self.assertEqual(len(programs),1)
         compile(programs[0],'<private-child>','exec')
 
+    def test_program_substitution_preserves_literals_and_quotes(self):
+        namespace={}
+        rendered=pilot.render_program("literal='PHP Warning';value=PHP;config=ENV",{'PHP':"/private/path'withquote",'ENV':{'example':'safe'}})
+        exec(rendered,namespace)
+        self.assertEqual(namespace['literal'],'PHP Warning')
+        self.assertEqual(namespace['value'],"/private/path'withquote")
+        self.assertEqual(namespace['config'],{'example':'safe'})
+
     def test_ssh_failure_is_redacted(self):
         with patch.object(launcher.subprocess,'run',side_effect=RuntimeError('sensitive-output')),patch('builtins.print') as output:
             self.assertEqual(launcher.main(),1)

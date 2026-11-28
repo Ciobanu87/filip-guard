@@ -9,7 +9,7 @@
   "real_groq_smtp_b2_calls": false,
   "production_activation": false,
   "extra_cloud_resources": false,
-  "inspection_revision": 11,
-  "reason": "Use signed vendor PHP extension configuration and diagnose local HTTP MIME failures without weakening REST checks",
+  "inspection_revision": 12,
+  "reason": "Substitute embedded identifiers through AST so diagnostic literals remain intact; compile rendered child program",
   "approved_independent_phase": "Actual disposable WordPress 7.1.5 with private PHP 8.3 and MariaDB 10.11; loopback-only network namespace"
 }
