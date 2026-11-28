@@ -9,7 +9,7 @@
   "real_groq_smtp_b2_calls": false,
   "production_activation": false,
   "extra_cloud_resources": false,
-  "inspection_revision": 9,
-  "reason": "Compile embedded child program offline before remote execution; preserve regex escapes in redaction",
+  "inspection_revision": 10,
+  "reason": "Route private PHP diagnostics to stderr so WP-CLI porcelain remains machine-readable; synthetic mail delivery denied",
   "approved_independent_phase": "Actual disposable WordPress 7.1.5 with private PHP 8.3 and MariaDB 10.11; loopback-only network namespace"
 }
