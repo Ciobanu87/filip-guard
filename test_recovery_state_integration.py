@@ -47,7 +47,7 @@ class NewStateRecoveryTests(unittest.TestCase):
 
     def test_existing_public_or_symlinked_workspace_is_not_silently_repaired_or_followed(self):
         f=fixture.UnifiedFlowTests();f.setUp();self.addCleanup(f.doCleanups)
-        parent=f.sites.root/'customers';parent.mkdir(mode=0o755)
+        parent=f.sites.root/'customers';parent.mkdir(mode=0o755);parent.chmod(0o755)
         principal=f.auth.resolve(f.a)
         with self.assertRaises(ValueError):f.sites._workspace(principal,f.site_a)
         self.assertEqual(parent.stat().st_mode & 0o777,0o755)
