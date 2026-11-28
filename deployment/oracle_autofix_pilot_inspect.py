@@ -17,6 +17,19 @@ def command(args):
     except (OSError,subprocess.TimeoutExpired):return ''
 
 
+def locate(names,paths=(),packages=()):
+    for name in names:
+        found=shutil.which(name)
+        if found:return found
+    for path in paths:
+        if Path(path).is_file() and os.access(path,os.X_OK):return path
+    # RPM database lookup is read-only; never install/enable repositories.
+    for package in packages:
+        for path in command(['rpm','-ql',package]).splitlines():
+            if path.startswith('/') and Path(path).name in names and Path(path).is_file() and os.access(path,os.X_OK):return path
+    return None
+
+
 def inspect():
     instance={}
     try:
@@ -27,18 +40,18 @@ def inspect():
     if type(shape) is not dict:shape={}
     memory=dict(line.split(':',1) for line in Path('/proc/meminfo').read_text().splitlines())
     fs=shutil.disk_usage(str(Path.home()))
-    php=shutil.which('php') or shutil.which('php8.3') or shutil.which('php83')
+    php=locate(('php','php8.3','php83'),('/usr/bin/php','/usr/local/bin/php','/opt/remi/php83/root/usr/bin/php'),('php-cli','php83-php-cli'))
     php_data={}
     if php:
         try:php_data=json.loads(command([php,'-r','echo json_encode(array("version"=>PHP_VERSION,"mysqli"=>extension_loaded("mysqli")));']))
         except Exception:pass
     version=php_data.get('version','')
     version=version if type(version) is str and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:[-+.a-zA-Z0-9]*)',version) else None
-    server=shutil.which('mariadbd') or shutil.which('mysqld')
+    server=locate(('mariadbd','mysqld'),('/usr/libexec/mariadbd','/usr/libexec/mysqld','/usr/sbin/mariadbd','/usr/sbin/mysqld','/usr/local/mysql/bin/mysqld','/usr/local/mariadb/bin/mariadbd'),('mariadb-server','mysql-server','mysql-community-server'))
     sql_server=bool(server)
     sql_version=command([server,'--no-defaults','--version']) if server else ''
     builtin_init=bool(server and re.search(r'\bVer 8\.',sql_version) and 'MariaDB' not in sql_version)
-    sql_init=bool(shutil.which('mariadb-install-db') or shutil.which('mysql_install_db'))
+    sql_init=bool(locate(('mariadb-install-db','mysql_install_db'),('/usr/bin/mariadb-install-db','/usr/bin/mysql_install_db','/usr/local/mysql/scripts/mysql_install_db'),('mariadb-server','mysql-server')))
     units=('filip-guard-ui.service','filip-guard-worker.service','filip-guard-state-backup.service','filip-guard-state-backup.timer')
     # systemctl exits nonzero for inactive units; explicitly read its stdout here.
     states=[]

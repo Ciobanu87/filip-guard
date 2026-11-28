@@ -8,5 +8,7 @@
   "public_listeners": false,
   "real_groq_smtp_b2_calls": false,
   "production_activation": false,
-  "extra_cloud_resources": false
+  "extra_cloud_resources": false,
+  "inspection_revision": 2,
+  "reason": "Verify standard libexec/local prefixes and installed RPM paths before declaring dependencies absent"
 }

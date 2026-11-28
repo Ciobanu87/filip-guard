@@ -35,3 +35,14 @@ class PilotAdmissionTests(unittest.TestCase):
 
     def test_unexpected_remote_fields_are_not_forwarded_to_logs(self):
         with self.assertRaises(ValueError):assess(self.report()|{'unreviewed_output':'must-not-be-forwarded'})
+
+    def test_dependency_lookup_checks_explicit_executable_without_installing(self):
+        from deployment.oracle_autofix_pilot_inspect import locate
+        from unittest.mock import patch
+        from pathlib import Path
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            executable=Path(directory)/'mariadbd';executable.write_text('synthetic executable');executable.chmod(0o700)
+            with patch('deployment.oracle_autofix_pilot_inspect.shutil.which',return_value=None),patch('deployment.oracle_autofix_pilot_inspect.command') as command:
+                self.assertEqual(locate(('mariadbd',),(str(executable),),('mariadb-server',)),str(executable))
+                command.assert_not_called()
