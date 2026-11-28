@@ -164,7 +164,7 @@ def run(data, helper):
           'FG_WP_SOURCE':str(ROOT/'official/wordpress'),'FG_WP_DB_SERVER':str(wrapper),
           'FG_WP_DB_BASEDIR':str(runtime/'usr'),'FG_WP_DB_DATADIR':str(work/'sql-data'),
           'FG_AI_AUTHORIZED':'0','FG_EMAIL_AUTHORIZED':'0','FG_STATE_BACKUP_AUTHORIZED':'0','FG_AUTOFIX_PRODUCTION_AUTHORIZED':'0'}
-        harness='''import os,json,resource,pwd,subprocess,runpy,unittest,sys
+        harness=r'''import os,json,resource,pwd,subprocess,runpy,unittest,sys
 os.environ.clear();os.environ.update(ENV)
 def progress(name):
  with open(STAGE,'w') as f:json.dump({'stage':name},f)

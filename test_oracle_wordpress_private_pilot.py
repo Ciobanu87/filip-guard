@@ -50,6 +50,13 @@ class PrivatePilotGuards(unittest.TestCase):
             with patch.object(pilot,'Path',return_value=proc):
                 self.assertEqual(pilot.descendant_rss(100),60*1024)
 
+    def test_embedded_child_program_compiles_before_any_remote_execution(self):
+        import ast
+        tree=ast.parse(Path('deployment/oracle_autofix_wordpress_pilot.py').read_text())
+        programs=[n.value.value for n in ast.walk(tree) if isinstance(n,ast.Assign) and isinstance(n.value,ast.Constant) and any(isinstance(t,ast.Name) and t.id=='harness' for t in n.targets)]
+        self.assertEqual(len(programs),1)
+        compile(programs[0],'<private-child>','exec')
+
     def test_ssh_failure_is_redacted(self):
         with patch.object(launcher.subprocess,'run',side_effect=RuntimeError('sensitive-output')),patch('builtins.print') as output:
             self.assertEqual(launcher.main(),1)
