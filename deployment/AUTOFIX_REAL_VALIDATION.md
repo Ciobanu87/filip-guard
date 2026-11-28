@@ -33,8 +33,10 @@ mare fișier are 51.442 octeți. Checksumul este o verificare de integritate, nu
 semnătură independentă. La orice diferență oprim transferul și analizăm cauza;
 nu schimbăm automat checksumul pentru a accepta alt conținut.
 
-Manifestul inert: `AUTOFIX_REAL_VALIDATION_PLAN.json`. Toate aprobările sale sunt
-false, mediul și originile reale sunt nealese. Numele fișierului nu corespunde
+Manifestul inert: `AUTOFIX_REAL_VALIDATION_PLAN.json`. La pregătirea inițială aprobările sale erau false. După aprobarea explicită a
+proprietarului, manifestul înregistrează pilotul privat autorizat și rezultatul
+parțial; aprobările pentru producție/instalări globale și originile de client
+rămân neacordate. Numele fișierului nu corespunde
 niciunui request Oracle urmărit de workflow-urile existente. Nu este politică de
 producție și nu este fișă de validare cu verificări trecute.
 
@@ -143,3 +145,12 @@ permisiunii; accesul privat îl stabilim ulterior dacă este indispensabil.
 recuperarea criptată a stării reale și activarea serviciilor. Înlocuirea cheii master,
 resetarea bugetului AI, activarea unui furnizor sau trecerea pe plan plătit nu sunt
 necesare pentru acest pilot. Validarea SMTP rămâne separată de AutoFix.
+
+
+## Rezultat după aprobarea proprietarului
+
+Pilotul nativ Python a fost executat pe VM existentă: 19 teste trecute, fără
+erori/omiteri, cu rețeaua izolată și fișierele temporare eliminate. Pilotul
+WordPress/PHP complet nu a fost executat: runtime-urile necesare lipsesc.
+Vezi `AUTOFIX_ORACLE_PILOT_RESULT.md` pentru măsurători și dovezi. Această
+autorizare nu a permis și nu a produs instalări globale sau activare de producție.

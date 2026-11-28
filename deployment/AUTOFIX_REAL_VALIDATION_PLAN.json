@@ -1,8 +1,8 @@
 {
   "schema": "filip-guard-autofix-next-validation-plan-v1",
   "prepared_on": "2026-11-28",
-  "execution_authorized": false,
-  "selected_environment": null,
+  "execution_authorized": true,
+  "selected_environment": "existing-oracle-private-pilot",
   "candidate": {
     "branch": "filip-guard-development",
     "commit": "ee593326f89b5db8a1f0700c6a9f18424a36e0e6",
@@ -12,12 +12,16 @@
     "archive_sha256": "75dbf433f0859ca93d6d970bd08af27a5280fc06526aa4f202d9f54222320902",
     "tracked_files": 367,
     "ci_run_id": 46120509281,
-    "passed_tests": {"core": 935, "disposable_wordpress": 24, "isolated_infrastructure": 8},
+    "passed_tests": {
+      "core": 935,
+      "disposable_wordpress": 24,
+      "isolated_infrastructure": 8
+    },
     "ci_jobs_passed": 5
   },
   "recommended_first_step": "private-disposable-pilot-on-existing-oracle-after-owner-approval",
   "oracle_pilot": {
-    "oracle_changes_authorized": false,
+    "oracle_changes_authorized": true,
     "global_dependency_installation_authorized": false,
     "only_existing_runtime_dependencies": true,
     "fresh_read_only_dependency_and_capacity_check_required": true,
@@ -75,5 +79,45 @@
     "shared database, existing customer state or actual credentials would be used",
     "public port, firewall, unit or production configuration change would be required",
     "uncertain mutation, failed restoration, leaked secret or incomplete cleanup"
-  ]
+  ],
+  "last_execution": {
+    "date": "2026-11-28",
+    "status": "partial-pilot-completed",
+    "workflow_run_id": 46130410616,
+    "workflow_job_id": 140934067184,
+    "full_wordpress_pilot_executed": false,
+    "full_wordpress_blocker": "PHP 8.3/mysqli and isolated SQL runtime/initializer not available in verified existing locations",
+    "native_python_subset_executed": true,
+    "native_tests": 19,
+    "native_failures": 0,
+    "native_errors": 0,
+    "native_skipped": 0,
+    "elapsed_seconds": 7.14,
+    "peak_private_disk_bytes": 1932374,
+    "network_namespace_isolated": true,
+    "non_application_uid": true,
+    "temporary_files_removed": true,
+    "guard_unit_states_unchanged": true,
+    "actual_customer_or_master_keys_used": false,
+    "global_installations": 0,
+    "production_autofix_activated": false,
+    "public_listeners_created": 0,
+    "groq_calls": 0,
+    "smtp_messages": 0,
+    "b2_calls": 0,
+    "actual_allocation": {
+      "shape": "VM.Standard.A1.Flex",
+      "ocpus": 1,
+      "memory_gib": 6,
+      "visible_block_devices_gib": 47
+    },
+    "published_allocation_limits_checked": true,
+    "account_billing_polled": false,
+    "ci_run_id": 46130410599,
+    "ci_tests_passed": {
+      "core": 944,
+      "disposable_wordpress": 24,
+      "isolated_infrastructure": 8
+    }
+  }
 }
