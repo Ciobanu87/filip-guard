@@ -54,11 +54,11 @@ existing files, change the installed application/runtime.env or start production
 There are no credentials in the repository or payload. No external check is pinged
 until the owner-controlled account and delivery integration are ready.
 
-Indispensable account step: sign into/create the Healthchecks free Hobbyist
-account and verify the desired administrator email. Confirm the account remains
-$0; use only email integrations. Create exactly two checks named FILIP GUARD host
-and FILIP GUARD incidents, each period 120 / grace 120, POST only, same verified
-email integration, down AND recovery notifications enabled. Do not assign `*`
+Account setup completed on 28 November: authenticated Hobbyist account and
+confirmed administrator email were verified. Exactly two checks named FILIP GUARD
+host and FILIP GUARD incidents are configured, each period 120 / grace 120, POST
+only, same verified email integration, down AND recovery notifications enabled.
+Remaining private handoff: introduce the two ingestion URLs directly on Oracle. Do not assign `*`
 (all integrations), SMS, phone, WhatsApp or paid channels.
 
 Two secret ingestion URLs must be introduced directly on Oracle with the hidden
@@ -116,8 +116,17 @@ Job 140977015907 returned `operator-prepared-held`: separate files/units prepare
 synthetic incident persistence and verified recovery passed, timer inactive, app
 units unchanged, production inactive, no packages or external pings/Groq/B2.
 
-The account page currently requires authentication. No account, verified email
-channel, real ingestion token, real incident notification or inbox-delivery proof
-is assumed. Current status is **prepared, not live-validated**. The independent
+The initial preparation left the account and delivery unvalidated; see the
+subsequent authenticated external validation below for the updated status. The independent
 observer cannot cover missing newly added application events until the separately
 approved application release is installed; the existing installed app is untouched.
+
+## External account update
+
+The authenticated Healthchecks Hobbyist account and its confirmed email integration
+were verified. Two checks are configured and a browser-originated timeout/recovery
+cycle completed; the provider marked email notifications Delivered. Both checks
+are paused pending the private Oracle ingestion-URL handoff. Oracle inspection
+confirms config is still absent and its observer timer inactive. See
+`HEALTHCHECKS_EXTERNAL_VALIDATION.md`; inbox receipt and real Oracle-origin pings
+are not claimed as verified. Latest controller regression: 1,011 tests passed.
