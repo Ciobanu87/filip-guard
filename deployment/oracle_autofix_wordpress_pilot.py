@@ -55,8 +55,9 @@ def bounded(args, *, env, cwd, log, seconds=360):
                 time.sleep(.5)
             if process.returncode:
                 diagnostic=Path(log).read_text(errors='replace')[-20000:]
-                for label,needle in (('no-package-match','No match for argument'),('repo-download-failed','Failed to download'),('gpg-check-failed','GPG check FAILED'),('gpg-key-unavailable','GPG key retrieval failed'),('module-unavailable','missing groups or modules'),('php-warning','PHP Warning'),('sql-init-failed','Installation of system tables failed'),('python-traceback','Traceback'),('test-errors','FAILED (errors='),('test-failures','FAILED (failures='),('permission-denied','Permission denied'),('sql-start-failed','SQL server failed to start')):
+                for label,needle in (('no-package-match','No match for argument'),('repo-download-failed','Failed to download'),('gpg-check-failed','GPG check FAILED'),('gpg-key-unavailable','GPG key retrieval failed'),('module-unavailable','missing groups or modules'),('php-warning','PHP Warning'),('sql-init-failed','Installation of system tables failed'),('python-traceback','Traceback'),('test-errors','FAILED (errors='),('test-failures','FAILED (failures='),('permission-denied','Permission denied'),('sql-start-failed','SQL server failed to start'),('php-extension-load','Unable to load dynamic library'),('loader-error','error while loading shared libraries'),('undefined-symbol','undefined symbol'),('called-process-error','CalledProcessError'),('assertion-error','AssertionError'),('module-not-found','ModuleNotFoundError'),('name-error','NameError'),('missing-path','No such file or directory')):
                     if needle in diagnostic and label not in DIAGNOSTICS:DIAGNOSTICS.append(label)
+                DIAGNOSTICS.extend('python-line-'+n for n in __import__('re').findall(r'File "<string>", line (\d+)',diagnostic) if 'python-line-'+n not in DIAGNOSTICS)
                 raise RuntimeError('Private command failed')
         finally:
             # Terminate descendants even when their parent has already exited.
@@ -137,6 +138,7 @@ def run(data, helper):
         wrapper=ROOT/'sql-server'
         wrapper.write_text('#!/bin/sh\nexec '+shlex.quote(str(sql))+' "$@" '+ ' '.join(shlex.quote(x) for x in ('--plugin-dir='+str(plugins),'--lc-messages-dir='+str(messages),'--socket='+str(work/'sql.sock'),'--innodb-buffer-pool-size=64M','--max-connections=10'))+'\n');wrapper.chmod(0o555)
         result=work/'result.json'
+        stage=work/'stage.json'
         child_env={**env,'HOME':str(work),'TMPDIR':str(work),'PATH':str(runtime/'usr/bin')+':/usr/bin:/bin',
           'LD_LIBRARY_PATH':str(runtime/'usr/lib64')+':'+str(runtime/'lib64'), 'PHP_INI_SCAN_DIR':str(work/'no-ini'),
           'FG_WP_PHP_BINARY':str(php),'FG_WP_PHP_INI':str(ini),'FG_WP_CLI':str(ROOT/'official/wp-cli.phar'),
@@ -145,6 +147,9 @@ def run(data, helper):
           'FG_AI_AUTHORIZED':'0','FG_EMAIL_AUTHORIZED':'0','FG_STATE_BACKUP_AUTHORIZED':'0','FG_AUTOFIX_PRODUCTION_AUTHORIZED':'0'}
         harness='''import os,json,resource,pwd,subprocess,runpy,unittest,sys
 os.environ.clear();os.environ.update(ENV)
+def progress(name):
+ with open(STAGE,'w') as f:json.dump({'stage':name},f)
+progress('namespace-admission')
 resource.setrlimit(resource.RLIMIT_CORE,(0,0))
 resource.setrlimit(resource.RLIMIT_AS,(1536*1024**2,1536*1024**2))
 resource.setrlimit(resource.RLIMIT_FSIZE,(256*1024**2,256*1024**2))
@@ -152,10 +157,13 @@ assert os.readlink('/proc/self/ns/net')!=HOST_NET
 assert os.listdir('/sys/class/net')==['lo']
 assert os.geteuid() not in (0,pwd.getpwnam('filipguard').pw_uid)
 assert not os.access('/srv/filip-guard/state',os.R_OK|os.W_OK)
+progress('php-runtime-probe')
 p=subprocess.run([PHP,'-c',INI,'-r','echo json_encode([PHP_VERSION,extension_loaded("mysqli"),class_exists("Phar")]);'],capture_output=True,text=True,check=True,timeout=10)
 versions=json.loads(p.stdout);assert versions[0].startswith('8.3.') and versions[1:]==[True,True]
+progress('private-sql-initialization')
 init=[INIT,'--no-defaults','--basedir='+BASE_DIR,'--datadir='+DATA_DIR,'--auth-root-authentication-method=normal','--skip-test-db','--user=nobody','--plugin-dir='+PLUGINS,'--lc-messages-dir='+MESSAGES]
 subprocess.run(init,check=True,timeout=90)
+progress('wordpress-fixture-and-tests')
 namespace=runpy.run_path(RUNNER,run_name='private_wordpress_pilot')
 cls=namespace['RealWordPressTests'];suite=unittest.TestSuite(cls(name) for name in NAMES)
 r=unittest.TextTestRunner(verbosity=2).run(suite)
@@ -164,7 +172,7 @@ raise SystemExit(0 if r.wasSuccessful() else 1)
 '''
         replacements={'ENV':child_env,'HOST_NET':os.readlink('/proc/self/ns/net'),'PHP':str(php),'INI':str(ini),
           'INIT':str(runtime/'usr/bin/mariadb-install-db'),'BASE_DIR':str(runtime/'usr'),'DATA_DIR':str(work/'sql-data'),
-          'PLUGINS':str(plugins),'MESSAGES':str(messages),'RUNNER':str(source/'tests/real_wordpress/run.py'),'NAMES':TESTS,'RESULT':str(result)}
+          'PLUGINS':str(plugins),'MESSAGES':str(messages),'RUNNER':str(source/'tests/real_wordpress/run.py'),'NAMES':TESTS,'RESULT':str(result),'STAGE':str(stage)}
         # Identifier substitution avoids modifying user data or string contents.
         import re
         harness=re.sub(r'\b('+ '|'.join(replacements)+r')\b',lambda m:repr(replacements[m[0]]),harness)
@@ -173,7 +181,9 @@ raise SystemExit(0 if r.wasSuccessful() else 1)
         PHASE='isolated-real-wordpress-tests'
         try:bounded([unshare,'--net','--','/usr/bin/python3','-c',launch],env=env,cwd=source,log=logs/'tests.log',seconds=240)
         except RuntimeError:
-            if not result.is_file():raise
+            if not result.is_file():
+                if stage.is_file():PHASE=json.loads(stage.read_text())['stage']
+                raise
         measured=json.loads(result.read_text())
         PHASE='cleanup'
         report=dict(status='private-wordpress-pilot-passed' if measured['tests']==len(TESTS) and not any(measured[k] for k in ('errors','failures','skipped')) else 'private-wordpress-pilot-failed',
