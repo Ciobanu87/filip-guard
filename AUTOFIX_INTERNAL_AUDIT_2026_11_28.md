@@ -81,3 +81,10 @@ was replaced/reset.
 
 Commercial/payment work remains deferred. No unknown gate is marked complete to
 make the release status green.
+
+
+Subsequent development: the separately gated production candidate is now
+implemented in `wordpress_production.py`; see `PRODUCTION_AUTOFIX.md` for the
+current contract and unperformed live-validation/activation gates. The findings
+and restrictions above record the earlier audit batch; its statement that no
+production path existed is historical, not the current implementation status.

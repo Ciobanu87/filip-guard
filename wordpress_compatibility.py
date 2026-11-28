@@ -31,7 +31,7 @@ def assess_compatibility(snapshot,evidence=None,*,reviewed_theme_sha256=None,now
         if type(stamp) not in (int,float) or not stamp<=timestamp<stamp+300:blockers.append('stale-environment-evidence')
         environments=('production',) if expected_environment=='production' else ('local','development','staging')
         if evidence.get('environment') not in environments:blockers.append('reviewed-validation-environment-required' if expected_environment else 'nonproduction-validation-environment-required')
-        if type(evidence.get('wp_version')) is not str or not re.fullmatch(r'6\.\d+(?:\.\d+)?',evidence['wp_version']):blockers.append('wordpress-version-review')
+        if type(evidence.get('wp_version')) is not str or not (re.fullmatch(r'6\.\d+(?:\.\d+)?',evidence['wp_version']) or evidence['wp_version']=='7.1.5'):blockers.append('wordpress-version-review')
         if evidence.get('multisite') is not False:blockers.append('multisite-unsupported-or-unknown')
         plugins=evidence.get('active_plugins')
         if type(plugins) is not list or any(p!='filip-guard-companion/filip-guard-companion.php' for p in plugins):blockers.append('plugin-profile-review')

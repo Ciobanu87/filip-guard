@@ -64,7 +64,7 @@ final class Filip_Guard_Companion {
                 || !is_int($resource['id']) || $resource['id'] <= 0 || $resource['id'] > 2147483647
                 || !in_array($resource['kind'],array('post','page'),true)) { return false; }
         }
-        if ($p['wp_version'] !== get_bloginfo('version') || $p['companion_sha256'] !== hash_file('sha256',__FILE__)
+        if ($p['wp_version'] !== '7.1.5' || $p['wp_version'] !== get_bloginfo('version') || $p['companion_sha256'] !== hash_file('sha256',__FILE__)
             || $p['theme_sha256'] !== self::theme_fingerprint() || is_multisite()) { return false; }
         if (!function_exists('get_mu_plugins') || !function_exists('get_dropins')) { require_once ABSPATH . 'wp-admin/includes/plugin.php'; }
         if (get_option('active_plugins',array()) !== array('filip-guard-companion/filip-guard-companion.php')

@@ -40,7 +40,7 @@ no trailing newline), a private regular file with no group/other access, at most
 | `protocol`, `profile` | `filip-guard-production-v1`, `classic-html-link-v1` |
 | `site_url` | Exact canonical HTTPS origin; no subdirectory, credentials or alternate origin |
 | `source_commit` | Reviewed 40-character commit, equal to operator `FG_RELEASE_COMMIT` |
-| `wp_version` | Exact reviewed WordPress 6.x version, not a generic compatibility claim |
+| `wp_version` | Exactly WordPress 7.1.5, pinned by the existing verified CI fixture; other versions stay blocked |
 | `theme_sha256`, `companion_sha256` | Actual reviewed theme manifest and current companion source digests |
 | `content_selector` | Reviewed unique content container, e.g. `article#post-{resource_id}` |
 | `resources` | One to ten distinct `{kind: post/page, id: positive integer}` targets |
@@ -60,7 +60,7 @@ the user's environment yet; CI creates explicitly synthetic fixture records only
 
 ## Supported runtime profile, checked again before conditional writes
 
-Single-site, exact version/theme/companion, only FILIP GUARD companion active,
+Single-site WordPress 7.1.5, exact reviewed theme/companion, only FILIP GUARD companion active,
 no MU plugins or drop-ins, only reviewed core metadata keys, authenticated site
 administrator, HTTPS and Application Password. Inventory binds exact resource,
 revision/content hash, time (at most five minutes) and matching policy digest.

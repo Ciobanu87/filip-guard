@@ -14,6 +14,7 @@ from wordpress_execution_gate import _origin
 from wordpress_compatibility import PROFILE,assess_compatibility
 
 CHECKS={'identity','compatibility','backup_restore','conditional_write','independent_verification','rollback','recovery','tenant_isolation'}
+SUPPORTED_PRODUCTION_VERSIONS=frozenset(('7.1.5',))
 FIELDS={'protocol','profile','site_url','source_commit','wp_version','theme_sha256','companion_sha256',
         'content_selector','resources','approved_at','expires_at','validation_sha256'}
 
@@ -56,7 +57,7 @@ def read_production_policy(policy_path,receipt_path,release_commit,*,now=None,fo
     if (doc['protocol']!='filip-guard-production-v1' or doc['profile']!=PROFILE
         or doc['site_url']!='https://'+_origin(doc['site_url'])
         or type(doc['source_commit']) is not str or not re.fullmatch('[0-9a-f]{40}',doc['source_commit'])
-        or doc['source_commit']!=release_commit or type(doc['wp_version']) is not str or not re.fullmatch(r'6\.\d+(?:\.\d+)?',doc['wp_version'])):
+        or doc['source_commit']!=release_commit or type(doc['wp_version']) is not str or doc['wp_version'] not in SUPPORTED_PRODUCTION_VERSIONS):
         raise ValueError('Reviewed release and canonical origin required')
     for key in ('theme_sha256','companion_sha256','validation_sha256'):
         if type(doc[key]) is not str or not re.fullmatch('[0-9a-f]{64}',doc[key]) or doc[key]=='0'*64:raise ValueError('Reviewed artifact digest required')

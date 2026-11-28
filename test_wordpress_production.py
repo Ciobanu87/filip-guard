@@ -19,7 +19,7 @@ import test_guard_application as fixture
 def artifacts(root,origin='https://controlled.example'):
     now=int(time.time());commit='c'*40
     receipt=dict(protocol='filip-guard-production-validation-v1',target_origin=origin,validation_origin='https://disposable.test',
-        environment='staging',source_commit=commit,wp_version='6.8',theme_sha256='b'*64,
+        environment='staging',source_commit=commit,wp_version='7.1.5',theme_sha256='b'*64,
         companion_sha256=sha256(Path('wordpress_companion/filip-guard-companion.php').read_bytes()).hexdigest(),
         content_selector='article#post-{resource_id}',validated_at=now-60,checks=dict.fromkeys(CHECKS,True))
     receipt_path=root/'validation.json';receipt_path.write_text(json.dumps(receipt));receipt_path.chmod(0o400)
@@ -46,6 +46,11 @@ class ProductionPolicyTests(unittest.TestCase):
         policy=self.read();self.assertEqual(policy.origin,'https://controlled.example')
         self.assertTrue(policy.permits('post',1));self.assertFalse(policy.permits('page',1))
         with self.assertRaises(ValueError):read_production_policy(self.path,self.receipt_path,'d'*40)
+    def test_unvalidated_versions_do_not_inherit_production_support(self):
+        for version in ('6.8','7.1.4','7.1.6','7.2'):
+            self.doc['wp_version']=version;self.write()
+            with self.assertRaises(ValueError):self.read()
+
     def test_expiry_can_preserve_history_scope_but_never_write_admission(self):
         future=self.doc['expires_at']+1
         with self.assertRaises(PermissionError):self.read(now=future)
@@ -89,7 +94,7 @@ class ProductionPolicyTests(unittest.TestCase):
     def test_profile_and_remote_policy_digest_must_match_fresh_snapshot(self):
         policy=self.read();snapshot=ResourceSnapshot(policy.origin,'post',1,'<a href="/old">x</a>','a'*64)
         evidence=dict(site_url=policy.origin,resource_type='post',resource_id=1,revision='a'*64,content_sha256=sha256(snapshot.content.encode()).hexdigest(),
-            observed_at=time.time(),environment='production',wp_version='6.8',multisite=False,active_plugins=['filip-guard-companion/filip-guard-companion.php'],
+            observed_at=time.time(),environment='production',wp_version='7.1.5',multisite=False,active_plugins=['filip-guard-companion/filip-guard-companion.php'],
             mu_plugins=[],dropins=[],metadata_keys=[],theme_sha256='b'*64,companion_sha256=self.doc['companion_sha256'],production_policy_sha256=policy.digest)
         policy.check_evidence(snapshot,evidence)
         for change in ({'wp_version':'6.9'},{'production_policy_sha256':'e'*64},{'active_plugins':['unknown/plugin.php']},{'observed_at':0}):

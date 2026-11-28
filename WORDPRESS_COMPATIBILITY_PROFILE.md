@@ -27,13 +27,15 @@ hooks/revisions; it does not emulate every `wp_update_post` input filter.
 It binds exact site, resource type/ID, revision and content SHA-256, and rejects
 evidence older than five minutes or dated in the future. Candidate scope requires:
 
-- Local/development/staging WordPress 6.x, single-site.
+- Local/development/staging WordPress 6.x or the checksum-pinned 7.1.5 fixture, single-site.
 - Only the reviewed FILIP GUARD companion active; no MU plugins or drop-ins.
 - Reviewed theme fingerprint; no inferred generic theme compatibility.
 - Only listed core metadata keys; builder/custom metadata remains a blocker.
 
-The version range is an admission to isolated validation, **not a claim that all
-WordPress 6.x versions were tested**. Evidence must come from an authorized
+The legacy 6.x range is an admission to isolated validation, **not a claim that all
+WordPress 6.x versions were tested**. The separate production candidate currently
+admits only the exact checksum-pinned WordPress 7.1.5 version; no other version
+inherits production support. Evidence must come from an authorized
 server-side inventory; no browser form or client-supplied dictionary can authorize
 a write. The companion now exposes an owner-only authenticated GET inventory, protected
 by the same nonproduction/test, TLS, Application Password and resource guards.
@@ -61,7 +63,7 @@ post-write verification, uncertain outcomes and separately approved restoration.
 Custom plugins/builders need their own compatibility work; they stay unsupported
 until that work is justified and approved within scope.
 
-The current application accepts only `.test` mutation origins. A separate production candidate is now implemented behind independent private
+The original test application accepts only `.test` mutation origins. A separate production candidate is now implemented behind independent private
 operator and WordPress-side gates; see `PRODUCTION_AUTOFIX.md`. It is not activated
 or approved for any real environment. The legacy test route remains `.test` only. Do not bypass
 that restriction, turn a readiness boolean into authority or enable the companion

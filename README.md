@@ -113,8 +113,9 @@ remain disabled for customer production sites; the candidate is connected only
 to the isolated authenticated test workspace.
 
 `wordpress_companion/filip-guard-companion.php` implements the matching candidate
-REST endpoint for posts/pages. It is disabled by default and refuses production
-environments. Nothing in this repository installs or enables it on any site.
+REST endpoint for posts/pages. It is disabled by default. Its original test
+flag refuses production; the separate production candidate requires independent
+reviewed app/WordPress policy admission. Nothing in this repository installs or enables it on any site.
 It requires HTTPS, Application Password authentication, per-resource edit
 permission and an explicit nonproduction test activation constant. It rejects
 unsupported payload fields and content that fails WordPress's post HTML filter.
@@ -171,7 +172,8 @@ native revisions and core save hooks, a mutating fixture plugin, draft pages,
 disabled/production guards, untrusted TLS, lost/truncated replies, rollback after
 verification failure and explicit rollback failure/conflict. Network faults are
 injected around actual WordPress requests; they are not claimed as a hosting outage.
-The companion remains test-only and production execution stays disabled.
+Production execution stays disabled by default; the original test flag cannot
+enable it. The separately gated candidate requires its own reviewed admission.
 
 
 ## Customer identity, site isolation and required external backup
