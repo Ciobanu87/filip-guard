@@ -149,7 +149,7 @@ def run(data, helper):
         modules=runtime/'usr/lib64/php/modules'
         ini=ROOT/'php.ini'
         extensions=('mysqlnd','mysqli','mbstring','ctype','iconv','tokenizer','zlib','phar','openssl','xml','dom','simplexml','xmlreader','xmlwriter')
-        ini.write_text('extension_dir='+str(modules)+'\n'+''.join('extension='+m+'.so\n' for m in extensions if (modules/(m+'.so')).is_file())+'memory_limit=256M\ndisplay_errors=stderr\nlog_errors=On\nerror_log=/dev/stderr\nsendmail_path=/usr/bin/false\n');ini.chmod(0o444)
+        ini.write_text('extension_dir='+str(modules)+'\n'+''+'memory_limit=256M\ndisplay_errors=stderr\nlog_errors=On\nerror_log=/dev/stderr\nsendmail_path=/usr/bin/false\n');ini.chmod(0o444)
         plugins=next((p for p in (runtime/'usr/lib64/mariadb/plugin',runtime/'usr/lib64/mysql/plugin') if p.is_dir()),None)
         messages=next((p for p in (runtime/'usr/share/mariadb',runtime/'usr/share/mysql') if (p/'english/errmsg.sys').is_file()),None)
         if not plugins or not messages:raise RuntimeError('Private SQL support paths missing')
@@ -159,7 +159,7 @@ def run(data, helper):
         result=work/'result.json'
         stage=work/'stage.json'
         child_env={**env,'HOME':str(work),'TMPDIR':str(work),'PATH':str(runtime/'usr/bin')+':/usr/bin:/bin',
-          'LD_LIBRARY_PATH':str(runtime/'usr/lib64')+':'+str(runtime/'lib64'), 'PHP_INI_SCAN_DIR':str(work/'no-ini'),
+          'LD_LIBRARY_PATH':str(runtime/'usr/lib64')+':'+str(runtime/'lib64'), 'PHP_INI_SCAN_DIR':str(runtime/'etc/php.d'),
           'FG_WP_PHP_BINARY':str(php),'FG_WP_PHP_INI':str(ini),'FG_WP_CLI':str(ROOT/'official/wp-cli.phar'),
           'FG_WP_SOURCE':str(ROOT/'official/wordpress'),'FG_WP_DB_SERVER':str(wrapper),
           'FG_WP_DB_BASEDIR':str(runtime/'usr'),'FG_WP_DB_DATADIR':str(work/'sql-data'),
@@ -188,12 +188,12 @@ progress('wordpress-fixture-and-tests')
 namespace=runpy.run_path(RUNNER,run_name='private_wordpress_pilot')
 extra=[]
 def classify(text):
- for label,needle in [('sql-permission','Permission denied'),('sql-unknown-option','unknown variable'),('sql-missing-file','No such file'),('sql-innodb','InnoDB'),('sql-unsupported','unsupported'),('db-connect','Connection refused'),('php-missing-function','undefined function'),('php-missing-class','Class '),('fixture-db-error','database connection')]:
+ for label,needle in [('sql-permission','Permission denied'),('sql-unknown-option','unknown variable'),('sql-missing-file','No such file'),('sql-innodb','InnoDB'),('sql-unsupported','unsupported'),('db-connect','Connection refused'),('php-missing-function','undefined function'),('php-missing-class','Class '),('fixture-db-error','database connection'),('php-fatal','Fatal error'),('php-header-warning','Cannot modify header'),('php-warning','PHP Warning'),('php-parse','Parse error')]:
   if needle in text and label not in extra:extra.append(label)
  import re
  for name in re.findall(r'undefined function ([a-zA-Z_][a-zA-Z_0-9]*)\(',text):
   if len(name)<80:extra.append('undefined-function:'+name)
-fixture_cls=namespace['RealWordPress'];original_command=fixture_cls.command;original_start=fixture_cls.start_database
+fixture_cls=namespace['RealWordPress'];original_command=fixture_cls.command;original_start=fixture_cls.start_database;original_close=fixture_cls.close
 def guarded_command(self,*args,**kwargs):
  try:return original_command(self,*args,**kwargs)
  except Exception as error:
@@ -204,7 +204,22 @@ def guarded_start(self):
   log=self.root/'database.log'
   if log.is_file():classify(log.read_text(errors='replace')[-10000:])
   raise
-fixture_cls.command=guarded_command;fixture_cls.start_database=guarded_start
+def guarded_close(self):
+ log=self.root/'php-server.log'
+ if log.is_file():classify(log.read_text(errors='replace')[-30000:])
+ return original_close(self)
+fixture_cls.command=guarded_command;fixture_cls.start_database=guarded_start;fixture_cls.close=guarded_close
+import wordpress_rest_gateway as rest
+original_parse=rest.parse_http_response
+http_diagnostics=[]
+def observed_parse(raw):
+ response=original_parse(raw)
+ types=[value.split(';')[0] for key,value in response.headers if key=='content-type']
+ if types!=['application/json'] and len(http_diagnostics)<3:
+  markers=[label for label,needle in [('wp-fatal',b'critical error'),('php-warning',b'Warning:'),('php-fatal',b'Fatal error:'),('wordpress-html',b'<html'),('redirect',b'redirect')] if needle in response.body]
+  http_diagnostics.append({'status':response.status,'types':[t for t in types if t in ('text/html','text/plain','application/json')],'markers':markers})
+ return response
+rest.parse_http_response=observed_parse
 cls=namespace['RealWordPressTests'];suite=unittest.TestSuite(cls(name) for name in NAMES)
 r=unittest.TextTestRunner(verbosity=2).run(suite)
 def safe_error(trace):
@@ -216,7 +231,7 @@ def safe_error(trace):
  last=re.sub(r'[^ \t\n]{12,}','[redacted]',last)
  return {'frames':frames[-4:],'summary':last[:300]}
 errors=[safe_error(trace) for _,trace in r.errors+r.failures]
-with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0],diagnostics=extra,error_summaries=errors,failed_cases=[getattr(t,'_testMethodName','setUpClass') for t,_ in r.failures+r.errors]),f)
+with open(RESULT,'w') as f:json.dump(dict(tests=r.testsRun,failures=len(r.failures),errors=len(r.errors),skipped=len(r.skipped),php_version=versions[0],diagnostics=extra,error_summaries=errors,http_diagnostics=http_diagnostics,failed_cases=[getattr(t,'_testMethodName','setUpClass') for t,_ in r.failures+r.errors]),f)
 raise SystemExit(0 if r.wasSuccessful() else 1)
 '''
         replacements={'ENV':child_env,'HOST_NET':os.readlink('/proc/self/ns/net'),'PHP':str(php),'INI':str(ini),
