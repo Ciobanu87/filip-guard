@@ -163,7 +163,7 @@ def run(data, helper):
         modules=runtime/'usr/lib64/php/modules'
         ini=ROOT/'php.ini'
         extensions=('mysqlnd','mysqli','mbstring','ctype','iconv','tokenizer','zlib','phar','openssl','xml','dom','simplexml','xmlreader','xmlwriter')
-        ini.write_text('extension_dir='+str(modules)+'\n'+''+'memory_limit=256M\ndisplay_errors=stderr\nlog_errors=On\nerror_log=/dev/stderr\nsendmail_path=/usr/bin/false\n');ini.chmod(0o444)
+        ini.write_text('extension_dir='+str(modules)+'\n'+''+'memory_limit=256M\ndisplay_errors=Off\nlog_errors=On\nerror_log=/dev/stderr\nsendmail_path=/usr/bin/false\n');ini.chmod(0o444)
         plugins=next((p for p in (runtime/'usr/lib64/mariadb/plugin',runtime/'usr/lib64/mysql/plugin') if p.is_dir()),None)
         messages=next((p for p in (runtime/'usr/share/mariadb',runtime/'usr/share/mysql') if (p/'english/errmsg.sys').is_file()),None)
         if not plugins or not messages:raise RuntimeError('Private SQL support paths missing')
