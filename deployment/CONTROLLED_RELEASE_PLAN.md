@@ -4,6 +4,10 @@ Prepared only. Do not execute these stages merely because this file exists.
 Budget ceiling remains zero; existing VM/47 GB volume only; no `main` change,
 new provider, upgrade, extra resource, new SSH key or AI budget reset.
 
+Next AutoFix stage: see `AUTOFIX_REAL_VALIDATION.md` and its inert JSON plan.
+The reviewed source candidate is frozen at `ee59332`; preparation does not grant
+Oracle changes, an actual-site trial or production activation.
+
 ## 0. Freeze and review the development candidate
 
 Record the exact development commit and its successful five CI jobs. Preserve
