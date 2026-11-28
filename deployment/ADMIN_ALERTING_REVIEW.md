@@ -27,9 +27,10 @@ Use an external dead-man monitor plus a small read-only operational relay over
 existing failure outcomes. This remains operational monitoring of the approved
 system; it adds no Guard product module or automatic remediation authority.
 
-Healthchecks.io currently publishes a $0 Hobbyist plan with 20 checks. At most
-five checks would be needed: host/worker heartbeat, AutoFix incident, AI incident,
-backup freshness and rollback/recovery incident. Use email only, no paid delivery
+Healthchecks.io currently publishes a $0 Hobbyist plan with 20 checks. Only two checks are needed: one external host/worker heartbeat and one
+aggregate operational incident check for AutoFix, AI, backup freshness and
+rollback/recovery. The incident check must stay failed while any incident is
+unresolved; ordinary heartbeats must never clear it. Use email only, no paid delivery
 channels. An external observer is necessary for loss of the entire VM. No extra
 Oracle resource, public inbound port, real AI health probe or customer-site scan
 is needed.

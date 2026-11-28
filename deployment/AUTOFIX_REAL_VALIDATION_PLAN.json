@@ -19,11 +19,11 @@
     },
     "ci_jobs_passed": 5
   },
-  "recommended_first_step": "private-disposable-pilot-on-existing-oracle-after-owner-approval",
+  "recommended_first_step": "review-passed-private-oracle-pilot-before-separate-owner-environment-authorization",
   "oracle_pilot": {
     "oracle_changes_authorized": true,
     "global_dependency_installation_authorized": false,
-    "only_existing_runtime_dependencies": true,
+    "only_existing_runtime_dependencies": false,
     "fresh_read_only_dependency_and_capacity_check_required": true,
     "synthetic_data_only": true,
     "use_actual_customer_state_or_keys": false,
@@ -36,19 +36,29 @@
     "minimum_remaining_free_bytes": 5368709120,
     "max_combined_test_memory_bytes": 2147483648,
     "max_wall_seconds": 900,
-    "php_runtime": "8.3 with mysqli; verify availability before selecting executor",
+    "php_runtime": "Private signed Oracle Linux aarch64 PHP 8.3 with mysqli",
     "wordpress": "checksum-pinned 7.1.5 clean official fixture",
     "database": "private disposable SQL instance; never default/shared port or existing data directory",
     "selected_tests": [
       "RealWordPressTests.test_real_production_profile_refuses_arbitrary_content_and_unadmitted_resource",
-      "RealWordPressTests.test_real_production_candidate_full_flow_uses_public_verification_and_reviewed_restore"
+      "RealWordPressTests.test_real_production_candidate_full_flow_uses_public_verification_and_reviewed_restore",
+      "RealWordPressTests.test_real_write_lost_or_incomplete_response_never_replays",
+      "RealWordPressTests.test_real_verification_disconnect_triggers_verified_rollback",
+      "RealWordPressTests.test_real_rollback_does_not_overwrite_later_wordpress_edit",
+      "RealWordPressTests.test_real_permission_revocation_before_application",
+      "RealWordPressTests.test_real_conditional_restore_and_idempotency",
+      "RealWordPressTests.test_real_race_at_the_sql_condition",
+      "RealWordPressTests.test_real_restore_lost_reply_is_explicitly_unverified"
     ],
     "real_groq_calls": 0,
     "real_smtp_messages": 0,
     "real_b2_calls": 0,
     "evidence_scope": "actual-host-readiness-for-known-disposable-profile-only",
     "proves_actual_customer_compatibility": false,
-    "proves_actual_external_b2_recovery": false
+    "proves_actual_external_b2_recovery": false,
+    "private_signed_dependency_installation_authorized": true,
+    "private_dependency_approval_date": "2026-11-28",
+    "sql_runtime": "Private signed Oracle Linux aarch64 MariaDB 10.11"
   },
   "owner_environment_validation": {
     "authorized": false,
@@ -73,7 +83,7 @@
   "halt_conditions": [
     "missing explicit owner authorization",
     "candidate source or checksum mismatch",
-    "missing runtime dependencies; propose exact free dependency plan instead of installing",
+    "runtime dependencies unavailable from approved free official signed ARM64 sources",
     "unexpected active application writers or changed host identity",
     "insufficient capacity or proposed execution limits cannot be enforced",
     "shared database, existing customer state or actual credentials would be used",
@@ -81,6 +91,60 @@
     "uncertain mutation, failed restoration, leaked secret or incomplete cleanup"
   ],
   "last_execution": {
+    "status": "private-wordpress-pilot-passed",
+    "workflow_run_id": 46141522686,
+    "workflow_job_id": 140968298788,
+    "finished_at_utc": "2026-11-28T11:51:10Z",
+    "executor_commit": "a6c769ed73b1060a8180c2800d217bbcdcdf1adf",
+    "candidate": "ee593326f89b5db8a1f0700c6a9f18424a36e0e6",
+    "measured": {
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "php_version": "8.3.37",
+      "diagnostics": [
+        "php-warning"
+      ],
+      "error_summaries": [],
+      "failed_cases": [],
+      "http_diagnostics": []
+    },
+    "elapsed_seconds": 200.04,
+    "private_disk_bytes": 1050423727,
+    "arm64": true,
+    "sql_family": "MariaDB 10.11",
+    "real_wordpress_version": "7.1.5",
+    "private_packages_gpg_checked": true,
+    "package_scriptlets_disabled": true,
+    "network_namespace_loopback_only": true,
+    "global_installations": 0,
+    "guard_unit_states_unchanged": true,
+    "host_rpm_packages_unchanged": true,
+    "temporary_files_removed": true,
+    "public_listeners_created": 0,
+    "actual_customer_or_master_keys_used": false,
+    "production_autofix_activated": false,
+    "groq_calls": 0,
+    "smtp_messages": 0,
+    "b2_calls": 0,
+    "full_wordpress_pilot_executed": true,
+    "full_wordpress_blocker": null,
+    "ci_run_id": 46141522675,
+    "ci_tests_passed": {
+      "core": 952,
+      "disposable_wordpress": 24,
+      "isolated_infrastructure": 8
+    },
+    "actual_allocation": {
+      "shape": "VM.Standard.A1.Flex",
+      "ocpus": 1,
+      "memory_gib": 6,
+      "visible_block_devices_gib": 47
+    },
+    "account_billing_polled": false
+  },
+  "prior_native_execution": {
     "date": "2026-11-28",
     "status": "partial-pilot-completed",
     "workflow_run_id": 46130410616,

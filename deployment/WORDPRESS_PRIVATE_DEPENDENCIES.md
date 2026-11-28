@@ -48,7 +48,8 @@ and pinned SHA-256 checks. Untrusted binaries and mismatched downloads stop the
 pilot; validation is never bypassed.
 
 Limits: 2 GiB private disk, 5 GiB minimum remaining free space, 820-second overall
-controller deadline, bounded individual commands, and unprivileged test process
+controller deadline, bounded individual commands, sampled aggregate descendant
+RSS monitoring (2 GiB termination threshold), and unprivileged test process
 virtual-memory/file limits. Temporary runtime, database, test credentials and
 logs are removed on normal controller exit including handled failures. A host
 crash/SIGKILL cannot guarantee Python cleanup; the temporary directory prefix is

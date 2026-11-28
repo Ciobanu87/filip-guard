@@ -1,96 +1,121 @@
-# Rezultatul pilotului Oracle — 28 noiembrie 2026
+# Pilot WordPress real pe Oracle — rezultat verificat
 
-**Rezultat parțial verificat:** proba nativă Python a trecut pe VM Oracle ARM64;
-proba WordPress/PHP completă este blocată de dependențele inexistente. Nu sunt
-același lucru și nu declarăm validarea WordPress pe host drept finalizată.
+**9/9 teste trecute**, zero eșecuri, zero erori, zero omiteri. Execuție încheiată
+la 28 noiembrie 2026, **13:51 EET / 11:51 UTC**. Nu este activare de producție.
 
-Dovadă directă:
-https://github.com/Ciobanu87/filip-guard/actions/runs/46130410616
-Job `pilot`, ID `140934067184`, încheiat cu succes. Raportul nativ a fost emis
-la 28 noiembrie 2026, 11:25 EET (09:25 UTC).
+- Pilot: https://github.com/Ciobanu87/filip-guard/actions/runs/46141522686
+- Job Oracle: `140968298788`, concluzie `success`.
+- Executor: `a6c769ed73b1060a8180c2800d217bbcdcdf1adf`.
+- Candidat aplicație păstrat: `ee593326f89b5db8a1f0700c6a9f18424a36e0e6`.
+- Raport structurat: `AUTOFIX_ORACLE_WORDPRESS_RESULT.json`.
 
-## Alocare și capacitate verificate înaintea execuției
+## Mediu și încadrare gratuită
 
-Prin SSH cu verificarea amprentei existente și prin metadata locală OCI:
+Înaintea execuției au fost reverificate identitatea SSH cu amprenta salvată,
+alocarea A1 ARM64 în Frankfurt — 1 OCPU, 6 GB RAM, 47 GiB block vizibil — și
+capacitatea: 4.734 MiB RAM disponibili, 20.121.239.552 octeți liberi. Nu s-au creat
+sau redimensionat resurse cloud. Dovezile proprietarului privind contul Free Tier,
+fără upgrade, unica instanță/volum și consumul zero au fost reutilizate. SSH nu
+este o verificare a facturării întregului cont; facturarea live nu a fost polled.
 
-- Frankfurt, `VM.Standard.A1.Flex`, 1 OCPU, 6 GB RAM; dispozitive block vizibile
-  însumând 47 GiB. Nicio alocare, redimensionare sau resursă cloud nouă.
-- 4.734 MiB RAM disponibili și 20.123.926.528 octeți liberi la admitere.
-- Cele patru unități UI/worker/backup/timer inactive înainte și nemodificate după.
-- Python existent disponibil; PHP/mysqli, server SQL și inițializator SQL nu au
-  fost identificate în PATH, prefixele standard/libexec și listele RPM verificate.
-  Docker și Podman nu au fost identificate. Nu s-a instalat niciun pachet.
+Configurația unică se încadrează în limitele oficiale consultate: maximum
+744 OCPU-ore și 4.464 GB-ore RAM pentru 31 de zile, sub 1.500/9.000, și 47 GB sub
+200 GB boot/block în home region. Surse oficiale și metoda de instalare:
+`WORDPRESS_PRIVATE_DEPENDENCIES.md`. Numai repository-urile publice Oracle gratuite;
+nicio subscripție ULN, resursă suplimentară, bază enterprise sau serviciu plătit.
 
-Sursa Oracle consultată la data execuției:
-https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm
-Limitele curente folosite: 1.500 OCPU-ore, 9.000 GB-ore RAM lunar și 200 GB total
-boot/block în home region. Pentru configurația unică declarată de proprietar,
-chiar 31 de zile înseamnă maximum 744 OCPU-ore și 4.464 GB-ore RAM; volumul rămâne
-47 GB. Utilizarea CPU în pilot nu schimbă alocarea instanței existente.
+Au fost instalate **temporar și privat** PHP **8.3.37**, mysqli și MariaDB din
+streamul **10.11**, inclusiv bibliotecile necesare. Pachetele ARM64 au fost
+verificate GPG; scriptlet-urile RPM au fost dezactivate. Nu s-a instalat global,
+nu s-au pornit unități SQL/PHP ale gazdei. Runtime-ul privat, WordPress-ul,
+baza SQL, credențialele sintetice și logurile private au fost eliminate după probă.
+Reconstruirea runtime-ului pentru corectarea unei probe eșuate este necesară tocmai
+pentru că execuțiile precedente și-au eliminat toate fișierele temporare.
 
-Aceasta este verificarea încadrării alocării, folosind și dovezile deja confirmate
-de proprietar: cont fără upgrade, singura VM/volum, consum și overage zero. Nu a
-fost interogată facturarea live și nu afirmăm că SSH poate verifica întregul cont.
-Pilotul nu a creat resurse sau trafic către furnizorii interziși.
+WordPress **7.1.5** și WP-CLI **2.12.0** au fost descărcate din sursele oficiale și
+verificate cu hashurile deja fixate. Copia candidatului a păstrat SHA-256 al
+arhivei: `75dbf433f0859ca93d6d970bd08af27a5280fc06526aa4f202d9f54222320902`.
 
-## Ce a rulat efectiv pe Oracle
+## Scenarii executate pe host
 
-Candidat exact: `ee593326f89b5db8a1f0700c6a9f18424a36e0e6`; arhiva a fost verificată
-cu SHA-256 din plan înaintea extragerii. Copia s-a aflat numai într-un director
-privat temporar, nu în aplicația instalată. Runtime-ul Python existent a fost
-folosit fără modificarea lui, sub utilizatorul existent `nobody`, diferit de
-utilizatorul aplicației. Testul a confirmat că starea aplicației nu era inscriptibilă
-de către copil. Spațiul de nume de rețea a fost separat și verificat din copil;
-mediul nu a primit credențiale reale sau căi către starea/cheile aplicației.
+| Test existent | Rezultat |
+| --- | --- |
+| Profilul de producție refuză conținut arbitrar și resurse neadmise | trecut |
+| Scanare → propunere → aprobare → backup verificat → aplicare → verificare publică independentă → restaurare aprobată | trecut |
+| Răspuns pierdut/trunchiat după scriere: rezultat incert, fără repetare automată | trecut |
+| Întrerupere la verificare: rollback verificat | trecut |
+| Rollback refuzat când există o modificare WordPress ulterioară | trecut |
+| Permisiune revocată înaintea scrierii: intervenție refuzată | trecut |
+| Restaurare condiționată și idempotentă | trecut |
+| Concurență în condiția SQL: protejarea versiunii | trecut |
+| Răspuns pierdut la restaurare: stare explicit neverificată, fără succes fals | trecut |
 
-Au trecut **19 teste**, zero erori, zero eșecuri și zero teste omise:
+Sursa testelor: `tests/real_wordpress/run.py`; lista exactă selectată se află în
+`oracle_autofix_wordpress_pilot.py`. Întreruperile sunt injectate în transportul
+fixture-ului după răspunsuri WordPress reale. Nu am oprit sau întrerupt aplicația
+reală și nu afirmăm că această probă testează oprirea fizică a VM.
 
-| Grup existent executat pe host | Teste | Acoperire |
-| --- | ---: | --- |
-| `test_autofix_failure_boundaries` | 7 | concurență, backup înainte de scriere, întreruperi simulate, expirare și confirmări invalide |
-| `test_autofix_recovery_review` | 3 | observații de recuperare fără deblocarea reîncercării, sesiune nouă și izolare |
-| `test_recovery_state_integration` | 2 | recuperare criptată cu cod de cont netrimis și jurnal AutoFix blocat; permisiuni/legături refuzate |
-| `test_wordpress_production.ProductionFlowTests` | 7 | diagnostic/aprobare/backup/verificare/restore și rollback pe backend WordPress **simulat** |
+Durata instalare/pregătire/testare măsurată de controller: **200,04 secunde**.
+Ocupare privată la final, înaintea curățării: **1.050.423.727 octeți**, nu o măsurare
+a maximului. Testele au rulat ca `nobody`, separat de utilizatorul aplicației,
+într-un namespace de rețea cu numai loopback, fără rute externe, și cu namespace
+PID separat pentru eliminarea proceselor rămase. Au existat praguri monitorizate
+pentru disc, RSS agregat al descendenților și timp, plus limite per proces.
 
-Durata măsurată: **7,14 secunde**. Maximul observat al fișierelor private ale
-pilotului: **1.932.374 octeți**. Copilul a avut limite explicite de CPU, fișier,
-core dump și memorie virtuală; nu pretindem o măsurare a vârfului RSS agregat.
-Întreruperile au fost simulate în fixture și urmate de redeschiderea motorului/
-stării; nu a fost oprit, repornit sau întrerupt serviciul real al aplicației.
+## Corecții și observații de mediu
 
-Backupul a folosit criptarea reală și verificarea readback/restaurare, dar stocarea
-externă a fost fixture-ul în memorie. **Nu este o nouă probă B2 reală** și nu este
-backup complet al unui WordPress de client. Nicio cheie master reală nu a fost
-folosită, înlocuită sau exportată.
+Executorul a fost corectat pentru enumerarea interfețelor din namespace, generarea
+sigură a programului copil și separarea diagnosticelor PHP de răspunsurile HTTP.
+Validatorul REST nu a fost modificat: răspunsurile cu MIME greșit au fost refuzate.
 
-Raportul confirmă: fișiere temporare șterse, stări unități nemodificate, zero
-instalări globale, zero listener public creat, zero Groq/SMTP/B2 și nicio activare
-AutoFix în aplicația reală. Kernel namespace-ul și contul de test au fost temporare;
-nu s-au modificat firewallul, unitățile sau configurația aplicației existente.
+Configurația finală folosește fișierele de extensii semnate ale distribuției,
+`display_errors=Off` și `log_errors=On`. Manualul PHP precizează că ținta `stderr`
+pentru afișare este eficientă numai în CLI/phpdbg/CGI; serverul încorporat folosește
+alt SAPI. Erorile nu trebuie afișate în răspunsuri REST:
+https://www.php.net/manual/en/errorfunc.configuration.php
 
-## Verificarea executorului și a codului din repository
+Raportul final păstrează un marker **`php-warning` nefatal** din logurile fixture-ului;
+nu pretindem că logurile sunt lipsite de avertismente. Mesajul brut nu a fost
+publicat și logurile temporare au fost șterse, deci cauza exactă a acestui marker
+nu poate fi afirmată din dovada păstrată. Toate aserțiunile au trecut, fără erori
+MIME/JSON în raportul final. Acest marker nu este folosit drept dovadă de producție
+sau SMTP și nu justifică reluarea automată a celor nouă teste deja trecute.
 
-https://github.com/Ciobanu87/filip-guard/actions/runs/46130410599
-Toate cele cinci joburi au trecut: **944 + 24 + 8 = 976 teste**. Cele 19 teste ale
-pilotului sunt reluate pe un alt mediu, nu 19 teste unice adăugate la acest total.
-Sunt nouă teste noi pentru admiterea/izolarea executorului; funcționalitățile
-produsului și candidatul aplicației nu au fost schimbate.
+## Limite importante ale rezultatului
 
-Commituri operaționale:
+Backupul a folosit criptarea reală, readback și restaurarea resursei, cu un object
+store sintetic în memorie. Nu este un apel B2 real și nu este un backup complet al
+unui site client. Profilul de producție a existat exclusiv în WordPress-ul privat
+de test, cu politică/receipt sintetice, fără chei sau date reale. Nu s-a emis un
+receipt de compatibilitate pentru un site client și nu s-a autorizat producția.
 
-- `967a18795b991b9d77179db476d71ae14936a196`: admiterea read-only autorizată.
-- `de1f92133faf4d41d84e24debb313caa2037d88d`: verificarea dependențelor și în afara PATH.
-- `8d01a85226c093d273ab2c0dd309610ca8af404f`: execuția subsetului nativ izolat.
+Raportul confirmă: fișiere temporare eliminate, inventar RPM global nemodificat,
+cele patru unități FILIP GUARD în aceeași stare oprită, zero porturi publice create,
+zero Groq/SMTP/B2, nicio utilizare/rotație a cheii master și nicio actualizare a
+aplicației existente. `main` a rămas la `763b71a5edee2324cfcbc4739138b4d48fd53e1c`.
 
-## Blocajul rămas în limitele aprobate
+## CI și probe anterioare păstrate
 
-Pentru testul WordPress/PHP pe Oracle lipsesc PHP 8.3 cu mysqli și un runtime SQL
-compatibil cu inițializare privată. Nu ocolim lipsa lor, nu instalăm global și nu
-folosim un SQL partajat. Instalarea de dependențe noi nu este permisă de aprobarea
-actuală. Continuarea acelei probe cere fie un runtime compatibil deja disponibil,
-fie o aprobare distinctă pentru instalare gratuită, cu lista și metoda revizuite
-înainte de execuție. Nu a fost solicitată vreo autentificare nouă sau cheie nouă.
+https://github.com/Ciobanu87/filip-guard/actions/runs/46141522675
+Toate cele cinci joburi verzi: **952 + 24 + 8 = 984 teste**, inclusiv opt teste
+noi de protecție a executorului. Probele container/persistență și operațiuni de host
+izolate au trecut și ele. Cele nouă teste Oracle sunt o execuție pe alt mediu,
+nu nouă teste unice care se adaugă la 984.
 
-`main` a rămas la `763b71a5edee2324cfcbc4739138b4d48fd53e1c`; serviciile de producție
-rămân oprite. Nici această probă nativă, nici CI nu sunt folosite pentru a genera
-un receipt de compatibilitate reală sau o politică de activare pentru un client.
+Subproba anterioară de **19 teste Python native** rămâne valabilă și nu a fost
+reluată: https://github.com/Ciobanu87/filip-guard/actions/runs/46130410616
+Detaliile istorice sunt păstrate în `AUTOFIX_ORACLE_NATIVE_PILOT_RESULT.md`.
+Evaluările AI reale, registrul de consum și custodia cheilor nu au fost reluate.
+
+## Ce rămâne separat
+
+- Alertarea administratorilor este incompletă; propunerea minimă gratuită este
+  în `ADMIN_ALERTING_REVIEW.md`, **neimplementată**, conform instrucțiunii de a o
+  prezenta înainte de implementare.
+- Validarea unui profil WordPress real autorizat și activarea aplicației Oracle
+  necesită în continuare aprobări distincte. Pilotul nu înlocuiește acele validări.
+- SMTP real și recuperarea externă B2 cu starea viitoarei instalări nu au fost
+  executate în această etapă; interdicțiile de apeluri reale au rămas active.
+
+Pilotul izolat cerut este încheiat. Produsul nu este declarat finalizat pentru
+producție pe baza acestei probe.

@@ -1,0 +1,39 @@
+{
+  "status": "private-wordpress-pilot-passed",
+  "workflow_run_id": 46141522686,
+  "workflow_job_id": 140968298788,
+  "finished_at_utc": "2026-11-28T11:51:10Z",
+  "executor_commit": "a6c769ed73b1060a8180c2800d217bbcdcdf1adf",
+  "candidate": "ee593326f89b5db8a1f0700c6a9f18424a36e0e6",
+  "measured": {
+    "tests": 9,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "php_version": "8.3.37",
+    "diagnostics": [
+      "php-warning"
+    ],
+    "error_summaries": [],
+    "failed_cases": [],
+    "http_diagnostics": []
+  },
+  "elapsed_seconds": 200.04,
+  "private_disk_bytes": 1050423727,
+  "arm64": true,
+  "sql_family": "MariaDB 10.11",
+  "real_wordpress_version": "7.1.5",
+  "private_packages_gpg_checked": true,
+  "package_scriptlets_disabled": true,
+  "network_namespace_loopback_only": true,
+  "global_installations": 0,
+  "guard_unit_states_unchanged": true,
+  "host_rpm_packages_unchanged": true,
+  "temporary_files_removed": true,
+  "public_listeners_created": 0,
+  "actual_customer_or_master_keys_used": false,
+  "production_autofix_activated": false,
+  "groq_calls": 0,
+  "smtp_messages": 0,
+  "b2_calls": 0
+}

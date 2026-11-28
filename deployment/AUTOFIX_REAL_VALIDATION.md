@@ -1,3 +1,8 @@
+> Actualizare 28 noiembrie 2026: aprobarea pilotului și a dependențelor private
+> a fost acordată; pilotul WordPress real pe Oracle a trecut 9/9. Propunerile de
+> aprobare și blocajele inițiale din acest document sunt istorice. Vezi
+> `AUTOFIX_ORACLE_PILOT_RESULT.md` pentru situația actuală. Producția rămâne oprită.
+
 # Următoarea validare AutoFix — pregătire, fără execuție
 
 Plan pregătit la 28 noiembrie 2026. Nu constituie aprobare și nu execută comenzi,
@@ -127,30 +132,27 @@ se adaptează numai după identificarea copiei și a accesului, fără ocolirea 
 
 ## Exact ce trebuie să faci personal
 
-**Acum este necesară numai alegerea/aprobarea mediului.** Dacă nu ai deja un
-WordPress de test, varianta de mai jos nu cere conturi noi sau comenzi pe telefon:
+Pilotul privat și instalarea dependențelor au fost aprobate și executate. **Nu mai
+este necesară intervenția proprietarului pentru acest pilot.** Au trecut 9/9
+scenarii WordPress reale pe Oracle, cu curățare verificată și producția oprită.
+Raport: `AUTOFIX_ORACLE_PILOT_RESULT.md`.
 
-> Aprob inventarul de pregătire și copierea candidatului ee59332 într-un director
-> privat separat pe Oracle existent. Aprob pilotul local cu date sintetice numai
-> dacă dependențele necesare există deja și limitele pot fi impuse. Fără instalări
-> globale, fără modificarea aplicației existente, fără servicii FILIP GUARD pornite,
-> fără porturi publice, Groq, SMTP, B2 real sau resurse suplimentare. Dacă lipsesc
-> dependențe, prezintă-mi exact lista înainte de orice instalare.
+Pentru etapele separate care nu sunt autorizate prin pilot:
 
-Acest text este doar o propunere de aprobare, **nu o aprobare deja acordată**.
-Dacă preferi copia WordPress existentă, furnizezi doar URL-ul și confirmarea
-permisiunii; accesul privat îl stabilim ulterior dacă este indispensabil.
+- Aprobarea propunerii minime de alertare și controlul/verificarea adresei de
+  administrator pentru contul extern gratuit, înaintea implementării.
+- Alegerea unei copii WordPress reale autorizate, URL-ul și confirmarea dreptului
+  de testare, înaintea validării unui profil client; accesul numai prin canal privat.
+- Aprobarea distinctă înaintea instalării versiunii în aplicația Oracle existente,
+  recuperării stării reale sau activării serviciilor. Validarea SMTP rămâne separată.
 
-Într-o etapă ulterioară vei aproba separat instalarea versiunii în aplicația Oracle,
-recuperarea criptată a stării reale și activarea serviciilor. Înlocuirea cheii master,
-resetarea bugetului AI, activarea unui furnizor sau trecerea pe plan plătit nu sunt
-necesare pentru acest pilot. Validarea SMTP rămâne separată de AutoFix.
+Înlocuirea cheii master, resetarea bugetului AI, activarea altui furnizor sau
+upgrade-ul la un plan plătit nu sunt necesare și nu au fost efectuate.
 
+## Rezultatul după aprobările proprietarului
 
-## Rezultat după aprobarea proprietarului
-
-Pilotul nativ Python a fost executat pe VM existentă: 19 teste trecute, fără
-erori/omiteri, cu rețeaua izolată și fișierele temporare eliminate. Pilotul
-WordPress/PHP complet nu a fost executat: runtime-urile necesare lipsesc.
-Vezi `AUTOFIX_ORACLE_PILOT_RESULT.md` pentru măsurători și dovezi. Această
-autorizare nu a permis și nu a produs instalări globale sau activare de producție.
+Proba nativă Python anterioară de 19 teste este păstrată, fără reluare. Proba nouă
+WordPress/PHP pe ARM64 a trecut 9/9: PHP 8.3.37 cu mysqli și SQL privat MariaDB
+10.11, date sintetice, rețea izolată, zero Groq/SMTP/B2 și toate fișierele temporare
+eliminate. Nu s-a modificat aplicația existentă sau `main` și nu s-a activat
+producția. Nu folosim receipt-urile sintetice pentru autorizarea unui site client.
