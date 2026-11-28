@@ -1,0 +1,41 @@
+{
+  "status": "implemented-and-oracle-prepared-awaiting-owner-healthchecks-account",
+  "commit": "008294de785d4b4ea79327231df1f1f5595e2656",
+  "oracle_workflow_run_id": 46144358244,
+  "oracle_workflow_job_id": 140977015907,
+  "ci_workflow_run_id": 46144358141,
+  "ci_jobs_passed": 5,
+  "ci_tests": {
+    "core": 976,
+    "disposable_wordpress": 24,
+    "isolated_infrastructure": 8,
+    "total": 1008
+  },
+  "new_operator_tests": 24,
+  "targeted_enabled_event_hook_regression_tests": 8,
+  "synthetic_latch_recovery_verified_on_oracle": true,
+  "operator_timer_active": false,
+  "production_active": false,
+  "installed_application_changed": false,
+  "guard_unit_states_unchanged": true,
+  "packages_installed": 0,
+  "external_ping_requests": 0,
+  "groq_calls": 0,
+  "b2_calls": 0,
+  "live_email_verified": false,
+  "live_healthchecks_config_present": false,
+  "healthchecks_published_plan": {
+    "name": "Hobbyist",
+    "monthly_usd": 0,
+    "checks_allowed": 20,
+    "checks_planned": 2
+  },
+  "account_plan_verified": false,
+  "main_unchanged": true,
+  "remaining": [
+    "Owner-controlled Healthchecks authentication/signup and verified administrator email",
+    "Confirm actual account Hobbyist $0, two email-only checks, POST, period 120/grace 120",
+    "Enter secret ingestion URLs directly on Oracle using hidden helper",
+    "Enable operator timer only; run live synthetic incident/recovery/dead-man tests and verify actual inbox arrival"
+  ]
+}

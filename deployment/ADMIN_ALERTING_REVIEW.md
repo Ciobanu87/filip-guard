@@ -1,3 +1,8 @@
+> Propunere istorică, aprobată de proprietar la 28 noiembrie 2026.
+> Implementare și rezultat actual: `ADMIN_ALERTING_IMPLEMENTATION.md` și
+> `ADMIN_ALERTING_RESULT.json`. Livrarea reală rămâne blocată de autentificarea
+> contului Healthchecks și de configurarea privată a destinației email.
+
 # Administrator alerting review — 28 November 2026
 
 Status: proposal only. No notification service, account, webhook, SMTP message,

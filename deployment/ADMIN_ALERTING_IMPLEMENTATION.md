@@ -99,3 +99,25 @@ repair inspection, AI/worker recovery evidence, restart limits, backup interlock
 private health endpoint, event redaction and fail-closed installer behavior.
 They are not claimed as real Healthchecks or real email delivery tests. Existing
 WordPress and AI real validations are preserved; no new Groq/SMTP/B2 calls.
+
+## Verified execution result
+
+Commit `008294de785d4b4ea79327231df1f1f5595e2656`. All five CI jobs passed:
+976 core + 24 disposable WordPress + 8 isolated infrastructure = **1,008 tests**.
+Of those, 24 are new operator protection tests. Eight targeted existing offline
+AutoFix tests were additionally run with FG_OPERATOR_EVENTS=1 specifically to
+validate the new opt-in event path: zero failures/errors, backup failure reported,
+uncertain writes and rollback outcomes preserved. These are not extra unique
+tests added to 1,008 and did not repeat the Oracle WordPress pilot or AI cases.
+
+CI: https://github.com/Ciobanu87/filip-guard/actions/runs/46144358141
+Oracle: https://github.com/Ciobanu87/filip-guard/actions/runs/46144358244
+Job 140977015907 returned `operator-prepared-held`: separate files/units prepared,
+synthetic incident persistence and verified recovery passed, timer inactive, app
+units unchanged, production inactive, no packages or external pings/Groq/B2.
+
+The account page currently requires authentication. No account, verified email
+channel, real ingestion token, real incident notification or inbox-delivery proof
+is assumed. Current status is **prepared, not live-validated**. The independent
+observer cannot cover missing newly added application events until the separately
+approved application release is installed; the existing installed app is untouched.
