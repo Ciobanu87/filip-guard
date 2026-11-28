@@ -17,6 +17,9 @@ from runtime_state import require_existing_guard_state
 
 
 def configured_guard_application():
+    if os.environ.get('FG_AUTOFIX_PRODUCTION_AUTHORIZED')=='1':
+        from wordpress_production import configured_production_application
+        return configured_production_application()
     if os.environ.get('FG_GUARD_TEST_UI')!='1':return None
     names=('FG_CUSTOMER_AUTH_DB','FG_CUSTOMER_DATA_ROOT','FG_MONITOR_DB','FG_GUARD_TEST_ORIGINS',
            )

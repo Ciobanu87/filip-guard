@@ -51,7 +51,10 @@ class AutoFixEngine:
     contain the affected resource content, not a complete WordPress site backup.
     The gateway is a trusted server dependency, never selected by client input.
     """
-    def __init__(self, database_path, backup_manager, gateway=None):
+    def __init__(self, database_path, backup_manager, gateway=None, *, pre_write_validator=None, post_write_verifier=None):
+        if any(callback is not None and not callable(callback) for callback in (pre_write_validator,post_write_verifier)):
+            raise ValueError('Trusted verification callbacks required')
+        self.pre_write_validator,self.post_write_verifier=pre_write_validator,post_write_verifier
         self.database_path = str(database_path)
         self.backups = backup_manager
         self.gateway = gateway if gateway is not None else DisabledWordPressGateway()
@@ -190,6 +193,8 @@ class AutoFixEngine:
                         user_id=user_id, current_content=observed.content,
                         proposed_content=payload['proposed_content'], now=instant)
         self.approvals.verify_session_binding(approval, session_id)
+        if self.pre_write_validator is not None and self.pre_write_validator(plan_id,original,payload['proposed_content']) is not True:
+            raise PermissionError('Production prewrite verification required')
         # Reserve before any external backup I/O, not only before the write.
         # A crashed preparation stays held across restarts; no duplicate upload.
         with self._db() as db:
@@ -221,6 +226,8 @@ class AutoFixEngine:
         # External backup readback may outlast the approval; re-check wall time.
         # Failure after this boundary stays held, including a process death after
         # consumption and before the applying journal update.
+        if self.pre_write_validator is not None and self.pre_write_validator(plan_id,original,payload['proposed_content']) is not True:
+            raise PermissionError('Production admission changed during backup')
         self.approvals.consume_for_offline_review(approval, site_url=original.site_url,
             resource_id=original.resource_id, user_id=user_id, current_content=original.content,
             proposed_content=payload['proposed_content'], now=_instant(now), session_id=session_id)
@@ -253,6 +260,8 @@ class AutoFixEngine:
             observed = self.gateway.read_authorized(original.site_url, original.resource_type,
                                                     original.resource_id, user_id)
             verify_unchanged(written, observed)
+            if self.post_write_verifier is not None and self.post_write_verifier(plan_id,original,written,'apply') is not True:
+                raise RuntimeError('Independent public verification failed')
         except Exception:
             # Rollback is conditional on the exact receipt, so a later edit wins.
             try:
@@ -265,6 +274,8 @@ class AutoFixEngine:
                     raise RuntimeError('Invalid rollback receipt')
                 verify_unchanged(restored, self.gateway.read_authorized(
                     original.site_url, original.resource_type, original.resource_id, user_id))
+                if self.post_write_verifier is not None and self.post_write_verifier(plan_id,written,restored,'rollback') is not True:
+                    raise RuntimeError('Independent rollback verification failed')
             except RevisionMismatchError:
                 return self._finish(plan_id, 'rollback_conflict', backup_id, changes_applied=None,
                                     detail='Concurrent edit preserved; restoration not completed.')

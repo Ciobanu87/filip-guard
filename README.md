@@ -241,3 +241,14 @@ See [MONITORING.md](MONITORING.md) for frequency/request limits, recovery semant
 private deployment paths and the prepared opt-in SMTP adapter. Email delivery
 remains unconfigured and disabled. Synthetic SMTP tests do not validate a real
 mail service. The public app/main branch and client AutoFix activation are unchanged.
+
+
+## Separately gated production AutoFix candidate
+
+The exact-link production route is now implemented but disabled. It reuses the
+existing engine and adds private reviewed admission, WordPress-side matching
+policy/profile/resource enforcement, independently rendered public verification
+and verified conditional rollback. The original `.test` workspace remains
+restricted; its flag cannot authorize production. See
+[PRODUCTION_AUTOFIX.md](PRODUCTION_AUTOFIX.md). Actual owner-environment validation
+and activation remain unperformed; no production policy/receipt is provisioned.

@@ -61,11 +61,12 @@ post-write verification, uncertain outcomes and separately approved restoration.
 Custom plugins/builders need their own compatibility work; they stay unsupported
 until that work is justified and approved within scope.
 
-The current application accepts only `.test` mutation origins. A general external
-staging/production activation path is not implemented or approved. Do not bypass
+The current application accepts only `.test` mutation origins. A separate production candidate is now implemented behind independent private
+operator and WordPress-side gates; see `PRODUCTION_AUTOFIX.md`. It is not activated
+or approved for any real environment. The legacy test route remains `.test` only. Do not bypass
 that restriction, turn a readiness boolean into authority or enable the companion
 in production merely because offline tests pass. Product-wide production AutoFix
-readiness therefore remains incomplete; the conservative profile and its tests
+live readiness therefore remains incomplete; the conservative profile and its tests
 are complete development evidence for this bounded candidate only.
 
 

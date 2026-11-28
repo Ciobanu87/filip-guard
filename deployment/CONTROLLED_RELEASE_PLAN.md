@@ -110,10 +110,12 @@ one supported link replacement, verified external content backup, concurrent-edi
 conflict, post-write verification, separate restore approval and monitor outcome.
 Do not enable the companion for production or expand `.test` mutation scope.
 Actual hosting/plugin compatibility is not established by the prior CI fixture.
-The current mutation UI accepts only `.test` origins and has no approved general
-external-staging activation path. Resolve/review that functional boundary and the
-compatibility profile in `../WORDPRESS_COMPATIBILITY_PROFILE.md` before proposing a real external staging trial; an approval
-alone must not be treated as code support for an otherwise rejected origin.
+The original test route still accepts only `.test` origins. The separate disabled
+production candidate is documented in `../PRODUCTION_AUTOFIX.md`; it requires
+matching operator/WordPress policy, exact validated release/profile/resource scope
+and a short admission window. Produce and review actual authorized-copy validation
+evidence before preparing its private receipt/policy. No fixture receipt may be
+reused as evidence for a real environment, and no approval alone fills unknown gates.
 
 Email: owner-confirmed free SMTP account, authenticated sender and consenting owner
 recipient; approve one bounded real delivery using existing TLS transport and

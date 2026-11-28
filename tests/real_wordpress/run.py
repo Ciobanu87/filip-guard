@@ -4,7 +4,7 @@ Never point this runner at an existing WordPress installation. It copies a clean
 WordPress source tree, creates its own database and generated test credentials,
 starts loopback HTTP/TLS servers, and destroys resources on exit. No public site.
 """
-from contextlib import ExitStack
+from contextlib import ExitStack,contextmanager
 from datetime import datetime, timedelta, timezone
 import http.client
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -572,6 +572,79 @@ class RealWordPressTests(unittest.TestCase):
         self.assertFalse(result['production_write_authorized']);self.assertFalse(result['live_compatibility_proven'])
         self.assertEqual(before,owner.read_authorized(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id))
         self.assertNotIn('password',json.dumps(evidence).lower())
+
+    @contextmanager
+    def production_fixture(self):
+        # Production software branch on a disposable .test host only.
+        from test_wordpress_production import artifacts
+        from hashlib import sha256
+        config=self.fixture.wp/'wp-config.php';saved=config.read_text()
+        observer=self.fixture.wp/'wp-content/mu-plugins/fg-fixture-observer.php'
+        observer_data=observer.read_bytes();old_theme=self.fixture.wpcli('option','get','stylesheet')
+        theme=self.fixture.wp/'wp-content/themes/fg-production-fixture';theme.mkdir(exist_ok=True)
+        (theme/'style.css').write_text('/* Theme Name: FG disposable classic fixture */')
+        (theme/'index.php').write_text('<?php ?><!doctype html><html><head><title>Fixture</title><meta name="description" content="Fixture"></head><body><?php while(have_posts()):the_post(); ?><article id="post-<?php the_ID(); ?>"><?php the_content(); ?></article><?php endwhile; ?></body></html>')
+        try:
+            observer.unlink();self.fixture.wpcli('theme','activate','fg-production-fixture')
+            self.fixture.wpcli('post','update',str(self.post_id),'--post_content=<h1>Source</h1><p><a href="/fg-production-missing/">Broken</a></p>')
+            destination=int(self.fixture.wpcli('post','create','--post_type=page','--post_status=publish',
+                '--post_title=Production destination','--post_content=<h1>Destination</h1>','--porcelain'))
+            source_url=self.fixture.wpcli('eval','echo get_permalink('+str(self.post_id)+');')
+            destination_url=self.fixture.wpcli('eval','echo get_permalink('+str(destination)+');')
+            owner=self.fixture.gateway(owner=True)
+            _,inventory=owner._request(f'/wp-json/filip-guard/v1/resources/post/{self.post_id}/compatibility')
+            evidence=inventory['evidence']
+            root=Path(self.temp.name);path,receipt_path,doc,receipt,write,commit=artifacts(root,self.fixture.site_url)
+            for key in ('wp_version','theme_sha256','companion_sha256'):doc[key]=receipt[key]=evidence[key]
+            doc['resources']=[dict(kind='post',id=self.post_id)]
+            receipt_path.chmod(0o600);receipt_path.write_text(json.dumps(receipt));receipt_path.chmod(0o400)
+            doc['validation_sha256']=sha256(receipt_path.read_bytes()).hexdigest();write()
+            text=saved.replace("'staging'","'production'")
+            text=text.replace("require_once ABSPATH.'wp-settings.php';",
+                "define('FILIP_GUARD_PRODUCTION_REPAIRS',true);\ndefine('FILIP_GUARD_PRODUCTION_POLICY_JSON',"+php_quote(path.read_text())+");\nrequire_once ABSPATH.'wp-settings.php';")
+            config.write_text(text);self.fixture.restart_php_server()
+            yield root,path,receipt_path,commit,source_url,destination_url,destination
+        finally:
+            config.write_text(saved);observer.write_bytes(observer_data)
+            self.fixture.wpcli('theme','activate',old_theme);self.fixture.restart_php_server()
+
+    def test_real_production_profile_refuses_arbitrary_content_and_unadmitted_resource(self):
+        with self.production_fixture() as (_,path,receipt_path,commit,source,destination,page_id):
+            from wordpress_production import ProductionWordPressGateway
+            from wordpress_production_policy import read_production_policy
+            provider=lambda:read_production_policy(path,receipt_path,commit)
+            gateway=ProductionWordPressGateway(self.fixture.site_url,lambda:('fg-admin',self.fixture.admin_password),provider)
+            original=gateway.read_authorized(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id)
+            # Ordinary trusted REST gateway intentionally reaches server defense.
+            owner=self.fixture.gateway(owner=True)
+            for content in ('<p>Unrelated replacement</p>','<h1>Source</h1><p><a href="https://other.test/new">Broken</a></p>'):
+                with self.assertRaises(PermissionError):owner.compare_and_swap(original,content,self.fixture.admin_id,operation_id=secrets.token_hex(16))
+            with self.assertRaises(PermissionError):owner.read_authorized(self.fixture.site_url,'page',page_id,self.fixture.admin_id)
+            self.assertEqual(original,gateway.read_authorized(self.fixture.site_url,'post',self.post_id,self.fixture.admin_id))
+
+    def test_real_production_candidate_full_flow_uses_public_verification_and_reviewed_restore(self):
+        with self.production_fixture() as (root,path,receipt_path,commit,source,destination,_):
+            from customer_auth import CustomerAuth
+            from monitoring_service import MonitoringService
+            from wordpress_production import ProductionCustomerSites,ProductionWordPressGateway,ProductionGuardApplication
+            from wordpress_production_policy import read_production_policy
+            from test_verified_external_backups import MemoryStore
+            provider=lambda:read_production_policy(path,receipt_path,commit)
+            auth=CustomerAuth(root/'production-accounts.sqlite');auth.register('owner','Disposable-owner-password')
+            token=auth.login('owner','Disposable-owner-password');store=MemoryStore()
+            sites=ProductionCustomerSites(auth,root/'production-sites',lambda _:b'p'*32,active_key_id='fixture',object_store=store,
+                gateway_factory=lambda origin,credentials:ProductionWordPressGateway(origin,credentials,provider),policy_provider=provider)
+            monitor=MonitoringService(sites,root/'production-monitor.sqlite')
+            app=ProductionGuardApplication(sites,monitor,policy_provider=provider)
+            site=app.connect(token,self.fixture.site_url,'fg-admin',self.fixture.admin_password)['site_id']
+            scan=app.scan(token,site,start_url=source,page_limit=1)
+            proposal=next(p for p in app.proposals(token,site,scan['scan_id']) if p['resource_id']==self.post_id)
+            review=app.prepare_repair(token,site,scan['scan_id'],proposal['issue_key'],self.post_id,destination)
+            applied=app.approve_and_apply(token,site,review['plan_id'],confirmed=True)
+            self.assertEqual(applied['status'],'applied');self.assertTrue(store.objects)
+            restore=app.prepare_restore(token,site,review['plan_id'])
+            self.assertEqual(app.approve_and_apply(token,site,restore['plan_id'],confirmed=True)['status'],'applied')
+            self.assertIn('/fg-production-missing/',sites.read_resource(token,site,'post',self.post_id).content)
 
     def test_real_site_ownership_requires_administrative_capability(self):
         with self.assertRaises(PermissionError):

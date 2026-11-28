@@ -17,7 +17,7 @@ def require_content_profile(content):
     return PROFILE
 
 
-def assess_compatibility(snapshot,evidence=None,*,reviewed_theme_sha256=None,now=None):
+def assess_compatibility(snapshot,evidence=None,*,reviewed_theme_sha256=None,now=None,expected_environment=None):
     if type(snapshot) is not ResourceSnapshot:raise ValueError('Trusted resource snapshot required')
     blockers=[]
     try:require_content_profile(snapshot.content)
@@ -29,7 +29,8 @@ def assess_compatibility(snapshot,evidence=None,*,reviewed_theme_sha256=None,now
         if any(evidence.get(k)!=v for k,v in expected.items()):blockers.append('resource-evidence-binding')
         stamp=evidence.get('observed_at');timestamp=time.time() if now is None else now
         if type(stamp) not in (int,float) or not stamp<=timestamp<stamp+300:blockers.append('stale-environment-evidence')
-        if evidence.get('environment') not in ('local','development','staging'):blockers.append('nonproduction-validation-environment-required')
+        environments=('production',) if expected_environment=='production' else ('local','development','staging')
+        if evidence.get('environment') not in environments:blockers.append('reviewed-validation-environment-required' if expected_environment else 'nonproduction-validation-environment-required')
         if type(evidence.get('wp_version')) is not str or not re.fullmatch(r'6\.\d+(?:\.\d+)?',evidence['wp_version']):blockers.append('wordpress-version-review')
         if evidence.get('multisite') is not False:blockers.append('multisite-unsupported-or-unknown')
         plugins=evidence.get('active_plugins')

@@ -13,7 +13,7 @@ The companion, repair origin restrictions and production guards remain intact.
 | Infrastructure Guard | Public DNS, verified TLS expiration, optional authoritative RDAP with unknowns preserved | Real authorized DNS/TLS/registrar coverage; no DNS/certificate/domain mutations |
 | AI Advisor | Provider interface, Groq adapter, evidence guard, scoped cache, global retained budget, per-provider backoff; historical nine live cases accepted | New complex semantic holdouts are simulated so far; prepared live runner defaults to approval-required; model quality/general safety are not established by contract tests |
 | Customer identity/isolation | Local accounts, salted password hashing, private durable sessions/site ownership and domain-control proofs | Opt-in verified-contact/password recovery implemented offline: expiring single-use codes, encrypted delivery queue, shared SMTP attempt cap and session revocation. Real TLS/mail delivery, signup/recipient policies and deletion/privacy workflow remain unvalidated/incomplete; no customer address was verified by this batch |
-| WordPress AutoFix | Exact broken-anchor replacement in post/page content: explicit session-bound approval, verified encrypted backup, conditional apply/verify/rollback and separate reviewed restore | Companion is nonproduction/test-only. Conservative classic-HTML profile now enforced before proposal and conditional writes; owner-only read-only environment inventory and evidence criteria are implemented. Live theme/plugin compatibility, permission/rollback validation and a reviewed production activation path remain unresolved. General metadata/plugin/builder repair and full-site restore are not implemented |
+| WordPress AutoFix | Exact broken-anchor replacement in post/page content: explicit session-bound approval, verified encrypted backup, conditional apply/verify/rollback and separate reviewed restore | Companion is nonproduction/test-only. Conservative classic-HTML profile now enforced before proposal and conditional writes; owner-only read-only environment inventory and evidence criteria are implemented. The separately gated production path now integrates operator admission, exact diagnosis, backup/CAS and independent rendered verification/rollback. It is disabled; actual live compatibility, validation artifacts and activation remain unperformed. General metadata/plugin/builder repair and full-site restore are not implemented |
 | Monitoring | Four-module scheduling, durable reservations/leases, verified resolution scopes, failure isolation, history/inbox and email outbox; no automatic model/repair execution | Oracle worker activation and sustained real operation require approval; live email delivery remains unvalidated |
 | External recovery | B2 mounted; owner-confirmed zero-dollar caps; notification API reported not enabled; owner independently recovered master fixture; real Oracle AI-ledger encrypted backup/fresh restore verified | This was one SQLite database, not full future customer state or WordPress/VM recovery. Keep private manifest/key custody, review current headroom before future writes, then validate newly provisioned full state |
 | Oracle runtime | Existing Always Free host installed/hardened/reboot-tested previously; private storage and inactive units | Installed application snapshot predates recent development. Current source install, explicit fresh account/site/monitor bootstrap, current root activation approval and controlled startup remain unperformed |
@@ -75,6 +75,14 @@ Password-change transactions recheck session revocation. Safety screening now
 checks Unicode-normalized draft text without changing retained source evidence.
 None of these tests validates actual Oracle state, real SMTP delivery, a customer
 WordPress environment or new provider semantics.
+
+## Disabled production route
+
+`PRODUCTION_AUTOFIX.md` specifies the implemented separate production admission
+and complete execution/recovery integration. The `.test` path remains unchanged.
+Private reviewed policy/receipt, matching WordPress-side policy and explicit
+independent flags are mandatory. No active policy or validation evidence for the
+actual customer environment is provisioned by this development.
 
 ## Readiness conclusion
 

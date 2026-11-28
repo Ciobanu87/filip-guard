@@ -38,6 +38,7 @@ function is_ssl() { return $GLOBALS['ssl']; }
 function get_current_user_id() { return 7; }
 function current_user_can($capability, $id = null) { return $GLOBALS['can_edit'] && $capability === 'edit_post' && $id === 10; }
 function clean_post_cache($id) {}
+function wp_parse_url($value) { return parse_url($value); }
 function wp_json_encode($value) { return json_encode($value); }
 function current_time($format, $gmt = false) { return '2026-11-23 20:00:00'; }
 function wp_kses_post($content) { return preg_replace('#<script>.*?</script>#s', '', $content); }
@@ -150,6 +151,21 @@ if ($scenario === 'bridge') {
         flush();
     }
     exit(0);
+}
+if ($scenario === 'production_link_profile') {
+    $method=new ReflectionMethod('Filip_Guard_Companion','production_link_change');
+    $policy=array('site_url'=>'https://example.test');
+    $before='<p><a class="keep" href="/old">Link</a></p>';
+    $after='<p><a class="keep" href="https://example.test/new">Link</a></p>';
+    check($method->invoke(null,$before,$after,$policy)===true,'exact quoted href allowed');
+    check($method->invoke(null,$after,$before,$policy)===true,'conditional original href restore allowed');
+    foreach (array('<p>Different content</p>','<p><a class="keep" href="https://other.test/new">Link</a></p>',
+        '<p><a class="changed" href="/new">Link</a></p>','<textarea><a href="/new">Literal</a></textarea>') as $unsafe) {
+        check($method->invoke(null,$before,$unsafe,$policy)===false,'non-link or cross-site change refused');
+    }
+    check($method->invoke(null,"<a title=\"see href='/old'\" href=/static>x</a>","<a title=\"see href='/new'\" href=/static>x</a>",$policy)===false,'attribute text is not a href');
+    check($method->invoke(null,'<a href=/old>x</a>','<a href=/new>x</a>',$policy)===false,'unquoted production profile refused');
+    echo 'PASS production_link_profile'; exit(0);
 }
 $request = new Request();
 $read = Filip_Guard_Companion::read($request);

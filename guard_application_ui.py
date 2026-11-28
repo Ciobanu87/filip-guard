@@ -14,18 +14,21 @@ def render_guard_application(st_module=None,*,application=None):
         ui.warning('The unified test workspace is not configured. Site changes remain disabled.')
         return False
     if application is None or not application.origins:return False
-    ui.subheader('FILIP GUARD — integrated test workspace')
-    ui.caption('Authorized isolated WordPress sites only. Customer production AutoFix is disabled.')
+    production=getattr(application,'production_mode',False)
+    ui.subheader('FILIP GUARD — approved repair workspace' if production else 'FILIP GUARD — integrated test workspace')
+    ui.caption('Exact reviewed link changes only; verified backup and conditional recovery required.' if production else 'Authorized isolated WordPress sites only. Customer production AutoFix is disabled.')
+    if production and not application.write_admission_active():
+        ui.warning('Repair admission is inactive. Saved history remains available; repair actions are held.')
     if application.simulated_storage:
         ui.warning('External backup storage is simulated in this isolated demonstration.')
-    render_customer_account(ui,auth=application.auth,allow_registration=application.allow_registration,sites=application.sites)
+    render_customer_account(ui,auth=application.auth,allow_registration=application.allow_registration,sites=application.sites,production_repairs=production)
     session=ui.session_state.get('fg_customer_session')
     if not session:return True
     try:
         application.auth.resolve(session)
-        with ui.expander('Connect an authorized WordPress test site',expanded=True):
+        with ui.expander('Connect an admitted WordPress site' if production else 'Connect an authorized WordPress test site',expanded=True):
             with ui.form('fg_guard_connect',clear_on_submit=True):
-                origin=ui.selectbox('Authorized WordPress test site',sorted(application.origins),key='fg_customer_guard_connect_origin')
+                origin=ui.selectbox('Admitted WordPress site' if production else 'Authorized WordPress test site',sorted(application.origins),key='fg_customer_guard_connect_origin')
                 username=ui.text_input('WordPress username')
                 password=ui.text_input('WordPress Application Password',type='password')
                 connect=ui.form_submit_button('Authorize site')
@@ -38,20 +41,21 @@ def render_guard_application(st_module=None,*,application=None):
                     ui.session_state['fg_customer_guard_site']=site['site_id'];ui.rerun()
         sites=[site for site in application.sites.list_sites(session) if site['origin'] in application.origins]
         if not sites:
-            ui.info('Authorize a WordPress test site for AutoFix, or a domain-owned resource below for read-only guards.')
+            ui.info('Authorize an admitted WordPress site, or a domain-owned resource below for read-only guards.' if production else 'Authorize a WordPress test site for AutoFix, or a domain-owned resource below for read-only guards.')
             render_monitoring(ui,service=application.monitor);return True
         names={site['site_id']:site['origin'] for site in sites};site_key='fg_customer_guard_site'
         if ui.session_state.get(site_key) not in names:ui.session_state.pop(site_key,None)
-        site_id=ui.selectbox('Connected test site',list(names),format_func=lambda value:names[value],key=site_key)
+        site_id=ui.selectbox('Connected site' if production else 'Connected test site',list(names),format_func=lambda value:names[value],key=site_key)
         prefix='fg_customer_guard_'+site_id
         inventory_key=prefix+'_inventory'
-        if inventory_key not in ui.session_state:ui.session_state[inventory_key]=application.resources(session,site_id)
+        if inventory_key not in ui.session_state:
+            ui.session_state[inventory_key]=[] if production and not application.write_admission_active() else application.resources(session,site_id)
         inventory=ui.session_state[inventory_key]
         targets=[names[site_id]]+[item['link'] for item in inventory]
         with ui.form(prefix+'_scan'):
             target=ui.selectbox('Page to scan',targets,key=prefix+'_target')
             pages=ui.number_input('Maximum pages for this scan',min_value=1,max_value=30,value=3,step=1,key=prefix+'_pages')
-            submitted=ui.form_submit_button('Scan authorized site')
+            submitted=ui.form_submit_button('Scan authorized site',disabled=production and not application.write_admission_active())
         if submitted:
             application.scan(session,site_id,start_url=target,page_limit=int(pages));ui.rerun()
         scan=application.scan_record(session,site_id)
@@ -94,9 +98,9 @@ def render_guard_application(st_module=None,*,application=None):
                 if review['state']=='proposed':
                     ui.write('Review the exact change');ui.code(review['diff'],language='diff')
                     confirmed=ui.checkbox('I approve exactly this change',key='fg_customer_guard_confirm_'+plan_id)
-                    ready=application.sites.object_store is not None and callable(application.sites.master_keys)
+                    ready=application.sites.object_store is not None and callable(application.sites.master_keys) and (not production or application.write_admission_active())
                     if not ready:ui.warning('Verified encrypted backup storage and keys must be configured before a repair.')
-                    if ui.button('Approve and apply test change',disabled=not confirmed or not ready,key='fg_customer_guard_apply_'+plan_id):
+                    if ui.button('Approve and apply change' if production else 'Approve and apply test change',disabled=not confirmed or not ready,key='fg_customer_guard_apply_'+plan_id):
                         try:application.approve_and_apply(session,site_id,plan_id,confirmed=confirmed)
                         except Exception:ui.error('The operation was blocked or interrupted. Review its recorded status before continuing.')
                         else:ui.rerun()

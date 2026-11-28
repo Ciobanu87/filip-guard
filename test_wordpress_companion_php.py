@@ -24,6 +24,7 @@ class CompanionPHPTests(unittest.TestCase):
         self.assertNotIn('fictitious-never-retained', result.stdout + result.stderr)
 
     def test_unsupported_content_profile_is_blocked_before_write(self):self.run_scenario('unsupported_profile')
+    def test_production_exact_href_profile(self):self.run_scenario('production_link_profile')
     def test_default_gate(self): self.run_scenario('disabled')
     def test_production_gate(self): self.run_scenario('production')
     def test_https_required(self): self.run_scenario('http')

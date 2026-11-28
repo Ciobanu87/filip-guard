@@ -10,7 +10,7 @@ def _clear_customer_state(ui):
             del ui.session_state[key]
 
 
-def render_customer_account(st_module=None, *, auth=None, allow_registration=None, sites=None):
+def render_customer_account(st_module=None, *, auth=None, allow_registration=None, sites=None, production_repairs=False):
     if st_module is None:
         import streamlit as st_module
     ui = st_module
@@ -54,7 +54,7 @@ def render_customer_account(st_module=None, *, auth=None, allow_registration=Non
                         _clear_customer_state(ui)
                         ui.warning('Your session has expired. Sign in again.')
                         return None
-                ui.caption('WordPress AutoFix remains unavailable for customer sites.')
+                ui.caption('Only admitted exact link repairs are available after explicit review.' if production_repairs else 'WordPress AutoFix remains unavailable for customer sites.')
                 return principal
         registering = allow_registration and ui.checkbox('Create an account', key='fg_account_register')
         with ui.form('fg_account_login', clear_on_submit=True):

@@ -1,12 +1,13 @@
 <?php
 /**
- * Plugin Name: FILIP GUARD Conditional Content Endpoint (Test Only)
- * Description: Gated candidate for authorized nonproduction WordPress validation.
- * Version: 0.1.0
+ * Plugin Name: FILIP GUARD Conditional Content Endpoint (Gated Candidate)
+ * Description: Disabled-by-default candidate with independent test and production admission.
+ * Version: 0.2.0
  * Requires PHP: 8.1
  * Requires at least: 6.0
  *
- * Not production-ready. Only post_content and modified timestamps are changed.
+ * Production activation requires matching reviewed operator policy and live validation.
+ * Only post_content and modified timestamps are changed.
  * A single byte-exact conditional SQL UPDATE prevents stale-row overwrites.
  * Runs core after-update/save actions for content revisions and hook consumers.
  * Input filters, builder metadata and arbitrary plugin compatibility are not guaranteed.
@@ -38,8 +39,89 @@ final class Filip_Guard_Companion {
         return array($kind, (int) $raw_id);
     }
 
+    private static function production_policy() {
+        if (!defined('FILIP_GUARD_PRODUCTION_REPAIRS') || FILIP_GUARD_PRODUCTION_REPAIRS !== true
+            || !defined('FILIP_GUARD_PRODUCTION_POLICY_JSON') || !is_string(FILIP_GUARD_PRODUCTION_POLICY_JSON)
+            || strlen(FILIP_GUARD_PRODUCTION_POLICY_JSON) > 32768) { return false; }
+        try {
+        $p = json_decode(FILIP_GUARD_PRODUCTION_POLICY_JSON, true);
+        $required = array('protocol','profile','site_url','source_commit','wp_version','theme_sha256','companion_sha256',
+            'content_selector','resources','approved_at','expires_at','validation_sha256');
+        if (!is_array($p)) { return false; }
+        $keys = array_keys($p); sort($keys); sort($required);
+        if ($keys !== $required || $p['protocol'] !== 'filip-guard-production-v1' || $p['profile'] !== 'classic-html-link-v1'
+            || !is_int($p['approved_at']) || !is_int($p['expires_at']) || $p['approved_at'] > time()
+            || $p['expires_at'] <= time() || $p['expires_at'] - $p['approved_at'] > 3600
+            || $p['site_url'] !== rtrim(home_url(), '/') || !is_string($p['source_commit'])
+            || !preg_match('/^[0-9a-f]{40}$/D', $p['source_commit']) || !is_string($p['content_selector'])
+            || !preg_match('/^[a-z][a-z0-9-]*#post-\{resource_id\}$/D', $p['content_selector'])
+            || !is_array($p['resources']) || count($p['resources']) < 1 || count($p['resources']) > 10) { return false; }
+        foreach (array('theme_sha256','companion_sha256','validation_sha256') as $key) {
+            if (!is_string($p[$key]) || !preg_match('/^[0-9a-f]{64}$/D', $p[$key]) || $p[$key] === str_repeat('0',64)) { return false; }
+        }
+        foreach ($p['resources'] as $resource) {
+            if (!is_array($resource) || count($resource) !== 2 || !isset($resource['id'],$resource['kind'])
+                || !is_int($resource['id']) || $resource['id'] <= 0 || $resource['id'] > 2147483647
+                || !in_array($resource['kind'],array('post','page'),true)) { return false; }
+        }
+        if ($p['wp_version'] !== get_bloginfo('version') || $p['companion_sha256'] !== hash_file('sha256',__FILE__)
+            || $p['theme_sha256'] !== self::theme_fingerprint() || is_multisite()) { return false; }
+        if (!function_exists('get_mu_plugins') || !function_exists('get_dropins')) { require_once ABSPATH . 'wp-admin/includes/plugin.php'; }
+        if (get_option('active_plugins',array()) !== array('filip-guard-companion/filip-guard-companion.php')
+            || get_mu_plugins() !== array() || get_dropins() !== array()) { return false; }
+        return $p;
+        } catch (Throwable $error) { return false; }
+    }
+
+    private static function production_link_change($before,$after,$policy) {
+        // Production accepts quoted href value changes only; never arbitrary content replacement.
+        if (preg_match('~<\s*(?:base|plaintext|script|style|textarea|title|xmp|iframe|noembed|noframes|template|noscript)\b~i',$before.$after)) { return false; }
+        $valid=true; $old=array(); $new=array();
+        $mask=function($html,&$values) use (&$valid) {
+            return preg_replace_callback('~<a\b(?:"[^"]*"|\'[^\']*\'|[^\'">])*>~is',function($match) use (&$values,&$valid) {
+                $tag=$match[0]; $offset=2; $value=null; $count=0;
+                // Tokenize attributes; href-looking text inside title/data is data.
+                while (preg_match('~\G\s+([A-Za-z_:][A-Za-z0-9_:.-]*)(?:\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+)))?~s',
+                    $tag,$attribute,PREG_OFFSET_CAPTURE|PREG_UNMATCHED_AS_NULL,$offset)) {
+                    $offset+=strlen($attribute[0][0]);
+                    if (strtolower($attribute[1][0])==='href') {
+                        $count++;
+                        if ($attribute[2][0]!==null) { $value=$attribute[2]; }
+                        elseif ($attribute[3][0]!==null) { $value=$attribute[3]; }
+                        else { $valid=false; }
+                    }
+                }
+                if (!preg_match('~^\s*/?>$~D',substr($tag,$offset)) || $count>1) { $valid=false; }
+                if ($count===0) { return $tag; }
+                if ($value===null) { $valid=false; return $tag; }
+                $values[]=$value[0];
+                return substr_replace($tag,'FILIP_GUARD_REVIEWED_HREF',$value[1],strlen($value[0]));
+            },$html);
+        };
+        $a=$mask($before,$old); $b=$mask($after,$new);
+        if (!$valid || !is_string($a) || $a !== $b || count($old)!==count($new)) { return false; }
+        $changes=0;
+        foreach ($new as $index=>$href) {
+            if ($href === $old[$index]) { continue; }
+            $changes++; $url=html_entity_decode($href,ENT_QUOTES|ENT_HTML5,'UTF-8');
+            if (!$url || preg_match('~[\x00-\x20\x7f\\\\]~',$url)) { return false; }
+            $parts=wp_parse_url($url);
+            if ($parts === false) { return false; }
+            if (isset($parts['scheme']) || isset($parts['host'])) {
+                $origin=wp_parse_url($policy['site_url']);
+                if (($parts['scheme']??'')!=='https' || ($parts['host']??'')!==$origin['host']
+                    || isset($parts['user']) || isset($parts['pass']) || (isset($parts['port']) && $parts['port']!==443)) { return false; }
+            } elseif (strpos($url,'//')===0 || strpos($url,':')!==false) { return false; }
+        }
+        return $changes>=1 && $changes<=20;
+    }
+
     private static function authenticated() {
-        if (!defined('FILIP_GUARD_TEST_REPAIRS') || FILIP_GUARD_TEST_REPAIRS !== true
+        if (wp_get_environment_type() === 'production') {
+            // Do not hash theme files for unauthenticated requests.
+            if (!defined('FILIP_GUARD_PRODUCTION_REPAIRS') || FILIP_GUARD_PRODUCTION_REPAIRS !== true
+                || !defined('FILIP_GUARD_PRODUCTION_POLICY_JSON')) { return self::error('fg_disabled',403); }
+        } elseif (!defined('FILIP_GUARD_TEST_REPAIRS') || FILIP_GUARD_TEST_REPAIRS !== true
             || !in_array(wp_get_environment_type(), array('local', 'development', 'staging'), true)) {
             return self::error('fg_disabled', 403);
         }
@@ -50,6 +132,7 @@ final class Filip_Guard_Companion {
         if ($user_id <= 0 || self::$application_user_id !== $user_id) {
             return self::error('fg_application_password_required', 401);
         }
+        if (wp_get_environment_type()==='production' && self::production_policy()===false) { return self::error('fg_disabled',403); }
         return true;
     }
 
@@ -59,6 +142,18 @@ final class Filip_Guard_Companion {
         $target = self::target($request);
         if (is_wp_error($target)) {
             return $target;
+        }
+        if (wp_get_environment_type() === 'production') {
+            $policy=self::production_policy(); $admitted=false;
+            if ($policy===false || !current_user_can('manage_options')) { return self::error('fg_disabled',403); }
+            foreach ($policy['resources'] as $resource) {
+                if ($resource['kind']===$target[0] && $resource['id']===$target[1]) { $admitted=true; }
+            }
+            $metadata=get_post_custom_keys($target[1]);
+            if ($metadata===null) { $metadata=array(); }
+            if (!$admitted || !is_array($metadata) || array_diff($metadata,array('_edit_lock','_edit_last','_wp_old_slug','_wp_page_template','_thumbnail_id'))) {
+                return self::error('fg_profile',403);
+            }
         }
         clean_post_cache($target[1]);
         if (!current_user_can('edit_post', $target[1])) {
@@ -194,7 +289,9 @@ final class Filip_Guard_Companion {
                 'observed_at' => time(), 'environment' => wp_get_environment_type(),
                 'wp_version' => get_bloginfo('version'), 'multisite' => is_multisite(),
                 'active_plugins' => array_values($plugins), 'mu_plugins' => $mu, 'dropins' => $dropins,
-                'metadata_keys' => array_values($metadata), 'theme_sha256' => self::theme_fingerprint());
+                'metadata_keys' => array_values($metadata), 'theme_sha256' => self::theme_fingerprint(),
+                'companion_sha256' => hash_file('sha256',__FILE__),
+                'production_policy_sha256' => wp_get_environment_type()==='production' ? hash('sha256',FILIP_GUARD_PRODUCTION_POLICY_JSON) : null);
             return self::response(array('protocol' => 'filip-guard-compatibility-v1',
                 'snapshot' => $snapshot, 'evidence' => $evidence));
         } catch (Throwable $error) {
@@ -234,6 +331,10 @@ final class Filip_Guard_Companion {
         }
         if (!self::compatible_content($row['post_content']) || !self::compatible_content($data['proposed_content'])) {
             return self::error('fg_compatibility', 409);
+        }
+        if (wp_get_environment_type()==='production') {
+            $policy=self::production_policy();
+            if ($policy===false || !self::production_link_change($row['post_content'],$data['proposed_content'],$policy)) { return self::error('fg_profile',403); }
         }
         // Unique option reservation is durable and survives lost replies/process restarts.
         // Pending reservations are never retried automatically after an uncertain outcome.
