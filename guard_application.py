@@ -232,6 +232,9 @@ class GuardApplication:
     def approve_and_apply(self,session,site_id,plan_id,*,confirmed=False):
         flow=self._flow(session,site_id,plan_id)
         if confirmed is not True:raise PermissionError('Explicit approval required')
+        # Reject stale-session/replayed plans before even the read-only URL probe.
+        review=self.sites.review(session,site_id,plan_id)
+        if review['state']!='proposed':raise PermissionError('A fresh session-bound proposal is required')
         if flow['kind']=='repair':
             scan=self.scan_record(session,site_id,flow['scan_id'])
             if not 0<=instant()-scan['created_at']<900:

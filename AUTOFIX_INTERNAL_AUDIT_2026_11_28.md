@@ -39,6 +39,10 @@ authorization transaction, tenant storage and UI changed. The original nine live
 AI cases are not repeated. Tests do not send real SMTP/Groq/B2 requests or touch
 Oracle/customer installations. Local TLS SMTP/S3/WordPress CI fixtures are disposable.
 
+A final preflight check also rejects previous-session or replayed plans before
+any replacement URL probe. Explicit confirmation cannot turn a stale proposal
+into authority for network work.
+
 ## Important limits preserved
 
 A reservation is not proof of external completion. If backup creation dies before

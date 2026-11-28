@@ -60,3 +60,14 @@ class RepairDiagnosisTests(unittest.TestCase):
             with self.assertRaises(UnsupportedRepair):f.application.approve_and_apply(f.a,f.site_a,review['plan_id'],confirmed=True)
             probe.assert_not_called()
         self.assertEqual(f.store.objects,{})
+
+    def test_replayed_or_previous_session_plan_is_blocked_before_url_probe(self):
+        f=fixture.UnifiedFlowTests();f.setUp();self.addCleanup(f.doCleanups);review=f.proposal()
+        fresh=f.auth.login('alice','Alice-unified-password')
+        with patch.object(f.application,'probe') as probe:
+            with self.assertRaises(PermissionError):f.application.approve_and_apply(fresh,f.site_a,review['plan_id'],confirmed=True)
+            probe.assert_not_called()
+        f.application.approve_and_apply(f.a,f.site_a,review['plan_id'],confirmed=True)
+        with patch.object(f.application,'probe') as probe:
+            with self.assertRaises(PermissionError):f.application.approve_and_apply(f.a,f.site_a,review['plan_id'],confirmed=True)
+            probe.assert_not_called()
